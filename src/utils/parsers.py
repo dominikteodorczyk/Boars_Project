@@ -1,5 +1,9 @@
 import pandas as pd
 import os
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 def raw_data_parser(
         input_path:str,
@@ -34,38 +38,89 @@ def raw_data_parser(
             output_path='data/processed'
         )
     """
+    try:
+        file_name = os.path.basename(input_path)
 
-    file_name = os.path.basename(input_path)
+        df = pd.read_csv(input_path)[cols]
+        df[cols[1]] = df[cols[1]].astype(str)
 
-    df = pd.read_csv(input_path)[cols]
-    df[cols[1]] = df[cols[1]].astype(str)
-
-    map_values = {
-        val:num for val, num in zip(
-            df[cols[1]].unique(), range(
-                len(df[cols[1]].unique())
+        map_values = {
+            val:num for val, num in zip(
+                df[cols[1]].unique(), range(
+                    len(df[cols[1]].unique())
+                    )
                 )
-            )
-        }
+            }
 
-    df[cols[1]] = df[cols[1]].map(map_values)
-    df.timestamp = pd.to_datetime(df.timestamp)
-    df.columns = ['datetime','user_id','lon', 'lat']
-    df = df.reset_index(drop=True)
+        df[cols[1]] = df[cols[1]].map(map_values)
+        df.timestamp = pd.to_datetime(df.timestamp)
+        df.columns = ['datetime','user_id','lon', 'lat']
+        df = df.reset_index(drop=True)
 
-    if output_path:
-        df.to_csv(
-            os.path.join(
-                output_path,
-                f'parsed_{file_name}'
-                ),
+        if output_path:
+            df.to_csv(
+                os.path.join(
+                    output_path,
+                    f'parsed_{file_name}'
+                    ),
+                    index=False
+                )
+        else:
+            df.to_csv(
+                f'parsed_{file_name}',
                 index=False
+                )
+        logging.info(f'{file_name} parsed successfully.')
+    except Exception as e:
+        logging.error(f'Error in {file_name}: \n{e}')
+
+def multi_raw_data_parser(
+        data_dict:dict[str:list],
+        output_path:str = None
+) -> None:
+    """
+    Parses raw data from multiple CSV files based on a dictionary
+    of file paths and column specifications,and optionally saves
+    the outputs to a specified path.
+
+    Args:
+        data_dict (dict[str, list]): A dictionary where the keys are
+            file paths to input CSV files and the valuesare lists of
+            column names to be selected from each input CSV file. The
+            columns in each list must be in the following order:
+            - The first column is the timestamp.
+            - The second column is the user ID.
+            - The third column is the longitude.
+            - The fourth column is the latitude.
+        output_path (str, optional): The directory path to save the
+            parsed CSV files.If not provided, the output files will
+            be saved in the current directory.
+
+    Returns:
+        None
+
+    Example:
+        data_dict = {
+            'data/raw_data1.csv': [
+                'timestamp',
+                'user',
+                'longitude',
+                'latitude'],
+            'data/raw_data2.csv': [
+                'time',
+                'id',
+                'lon',
+                'lat']
+        }
+        dir_raw_data_parser(data_dict, output_path='data/processed')
+    """
+    for key, value in data_dict.items():
+        raw_data_parser(
+            input_path=key,
+            cols=value,
+            output_path=output_path
             )
-    else:
-        df.to_csv(
-            f'parsed_{file_name}',
-            index=False
-            )
+
 
 
 
