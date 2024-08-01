@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import logging
+from pandas.errors import ParserError
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -42,6 +43,8 @@ def raw_data_parser(
         file_name = os.path.basename(input_path)
 
         df = pd.read_csv(input_path)[cols]
+        rows_no = df.shape[0]
+
         df[cols[1]] = df[cols[1]].astype(str)
 
         map_values = {
@@ -53,7 +56,15 @@ def raw_data_parser(
             }
 
         df[cols[1]] = df[cols[1]].map(map_values)
-        df.timestamp = pd.to_datetime(df.timestamp)
+
+        try:
+            df[cols[0]] = pd.to_datetime(df[cols[0]])
+            df[cols[0]] = df[cols[0]].dt.strftime('%Y-%m-%d %H:%M:%S')
+        except (ValueError, TypeError, ParserError) as e:
+            logging.error(f'Time parser error: {e}')
+
+
+
         df.columns = ['datetime','user_id','lon', 'lat']
         df = df.reset_index(drop=True)
 
@@ -70,9 +81,10 @@ def raw_data_parser(
                 f'parsed_{file_name}',
                 index=False
                 )
-        logging.info(f'{file_name} parsed successfully.')
+        logging.info(f'{file_name} parsed successfully. Rows {rows_no}/{df.shape[0]}')
     except Exception as e:
         logging.error(f'Error in {file_name}: \n{e}')
+
 
 def multi_raw_data_parser(
         data_dict:dict[str:list],
@@ -120,7 +132,7 @@ def multi_raw_data_parser(
             cols=value,
             output_path=output_path
             )
-
+    logging.info(f'Parsing done.')
 
 
 
