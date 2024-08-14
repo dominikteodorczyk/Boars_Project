@@ -5,6 +5,25 @@ from pandas.errors import ParserError
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+def test_data_detector(id: str) -> bool:
+    """
+    Detects if a given ID string is marked as test data.
+
+    This function checks whether the provided ID string contains
+    the word "test" or "Test", indicating that it is test data.
+
+    Args:
+        id (str): The ID string to be checked for test indicators.
+
+    Returns:
+        bool: True if the ID contains "test" or "Test", False otherwise.
+    """
+    id_strings = id.replace('_', ' ').split()
+    if 'test' in id_strings or 'Test' in id_strings:
+        return True
+    else:
+        return False
+
 
 def raw_data_parser(
         input_path:str,
@@ -46,6 +65,8 @@ def raw_data_parser(
         rows_no = df.shape[0]
 
         df[cols[1]] = df[cols[1]].astype(str)
+
+        df = df[~df[cols[1]].apply(test_data_detector)]
 
         map_values = {
             val:num for val, num in zip(
