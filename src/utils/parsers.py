@@ -19,7 +19,7 @@ def test_data_detector(id: str) -> bool:
         bool: True if the ID contains "test" or "Test", False otherwise.
     """
     id_strings = id.replace('_', ' ').split()
-    if 'test' in id_strings or 'Test' in id_strings:
+    if 'test' in id_strings or 'Ida' in id_strings or 'Wild' in id_strings:
         return True
     else:
         return False
