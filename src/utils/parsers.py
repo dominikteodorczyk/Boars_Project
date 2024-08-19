@@ -3,7 +3,10 @@ import os
 import logging
 from pandas.errors import ParserError
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+    )
 
 def test_data_detector(id: str) -> bool:
     """
