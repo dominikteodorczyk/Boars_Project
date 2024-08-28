@@ -74,7 +74,7 @@ class DistributionFitingTools:
     """
     def __init__(self) -> None:
         self.curves = Curves()
-        
+
     def fit_distribution(self, data, distribution):
         """
         Fits a given distribution to the data
@@ -101,7 +101,7 @@ class DistributionFitingTools:
         aicc = aic + (2 * num_params * (num_params + 1)) / (len(data) - num_params - 1)  # AICc correction
         return aicc
 
-    
+
     def calculate_akaike_weights(self,aic_values):
         """
         Calculates Akaike weights from AIC values.
@@ -121,10 +121,10 @@ class DistributionFitingTools:
         weights = exp_term / np.sum(exp_term)
         return weights
 
-    
+
     def multiple_distributions(self, data):
         """
-        Fits multiple distributions to the data and selects 
+        Fits multiple distributions to the data and selects
         the best one based on AICc.
 
         Parameters:
@@ -138,10 +138,10 @@ class DistributionFitingTools:
             The best fitting distribution.
         """
         distributions = [
-            stats.lognorm, 
-            stats.expon, 
-            stats.powerlaw, 
-            stats.norm, 
+            stats.lognorm,
+            stats.expon,
+            stats.powerlaw,
+            stats.norm,
             stats.pareto
             ]
 
@@ -160,10 +160,10 @@ class DistributionFitingTools:
         print(f"Best Distribution: {best_distribution.name}")
         print(f"AICc Weights: {weights}")
         return best_distribution
-    
+
     def model_choose(self, vals):
         """
-        Chooses the best fitting model from a set of predefined curves 
+        Chooses the best fitting model from a set of predefined curves
         based on AICc.
 
         Parameters:
@@ -174,15 +174,16 @@ class DistributionFitingTools:
         Returns:
         -------
         tuple
-            The best fit model, its name, parameters, and a DataFrame 
+            The best fit model, its name, parameters, and a DataFrame
             containing model information.
         """
         scores = {}
         parameters = {}
+        expon_pred = None
         for c in [
             self.curves.linear,
-            self.curves.expon, 
-            self.curves.expon_neg, 
+            self.curves.expon,
+            self.curves.expon_neg,
             self.curves.sigmoid
             ]:
             try:
@@ -190,6 +191,8 @@ class DistributionFitingTools:
                 num_params = len(params)
 
                 y_pred = c(vals.index,*params)
+                if c.__name__ == 'expon':
+                    expon_pred = y_pred
                 residuals = vals.values - y_pred
 
                 aic = len(vals.index) * np.log(
@@ -234,10 +237,10 @@ class DistributionFitingTools:
                     'param1' : round(value2[0],25),
                     'param2' : round(value2[1],25)
                 }, ignore_index = True)
-        
+
         best_fit = max(waicc, key=waicc.get)
         params, _ = curve_fit(best_fit, vals.index.values, vals.values)
-        
+
         print(f'Fitting results: \n{global_params}')
         print(f'Best fit: {best_fit.__name__}, param1: {params[0]}, param2: {params[1]}')
-        return best_fit(vals.index,*params), best_fit.__name__, params, global_params
+        return best_fit(vals.index,*params), best_fit.__name__, params, global_params, expon_pred
