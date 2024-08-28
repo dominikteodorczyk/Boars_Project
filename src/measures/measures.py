@@ -35,10 +35,12 @@ class Measures:
     stats : MeasurmentsStatistics
         An object to store the statistical results.
     """
-    def __init__(self, clear_data: TrajectoriesFrame, calc_type: str) -> None:
+    def __init__(self, clear_data: TrajectoriesFrame, calc_type: str, min_label_no:int, min_records_no:int) -> None:
         self.clear_data = clear_data
         self.visitatio_frequency_chart = None
         self.calc_type = calc_type
+        self.min_label_no = min_label_no
+        self.min_records_no = min_records_no
         self.stats = MeasurmentsStatistics()
 
     def curve_plt(self, rowwise_avg, y_pred, y_label, x_label):
@@ -100,13 +102,13 @@ class Measures:
         Plots the visitation frequency if the calc_type is 'jupiter'.
         """
         vf = visitation_frequency(self.clear_data)
-        avg_vf = rowwise_average(vf)
+        avg_vf = rowwise_average(vf, row_count=self.min_label_no)
         avg_vf.index = avg_vf.index + 1
         vf.groupby(level=0).size().median()
         avg_vf = avg_vf[~avg_vf.isna()]
 
         # model selection
-        y_pred, best_fit, best_fit_params, global_params = (
+        y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
             DistributionFitingTools().model_choose(avg_vf)
         )
 
@@ -125,6 +127,14 @@ class Measures:
                 y_label = 'f',
                 x_label = 'Rank'
                 )
+            if best_fit == 'sigmoid':
+                self.curve_plt(
+                    rowwise_avg=avg_vf,
+                    y_pred= expon_y_pred,
+                    y_label= 'MSD',
+                    x_label= 't'
+                )
+
 
 
     def distinct_locations_over_time(self):
@@ -134,13 +144,13 @@ class Measures:
         """
 
         dlot = distinct_locations_over_time(self.clear_data)
-        avg_dlot = rowwise_average(dlot)
+        avg_dlot = rowwise_average(dlot, row_count=self.min_label_no)
         avg_dlot.index += 1
         dlot.groupby(level=0).size().median()
         avg_dlot = avg_dlot[~avg_dlot.isna()]
 
         # model selection
-        y_pred, best_fit, best_fit_params, global_params = (
+        y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
             DistributionFitingTools().model_choose(avg_dlot)
         )
 
@@ -158,6 +168,13 @@ class Measures:
                 y_pred = y_pred,
                 y_label = 'S(t)',
                 x_label = 't'
+                )
+            if best_fit == 'sigmoid':
+                self.curve_plt(
+                    rowwise_avg=avg_dlot,
+                    y_pred= expon_y_pred,
+                    y_label= 'MSD',
+                    x_label= 't'
                 )
 
 
@@ -308,7 +325,7 @@ class Measures:
 
 
         # model selection
-        y_pred, best_fit, best_fit_params, global_params = (
+        y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
             DistributionFitingTools().model_choose(avg_rog)
         )
 
@@ -325,7 +342,13 @@ class Measures:
                 y_label='',
                 x_label= 'Values'
                 )
-
+            if best_fit == 'sigmoid':
+                self.curve_plt(
+                    rowwise_avg=avg_rog,
+                    y_pred= expon_y_pred,
+                    y_label= 'MSD',
+                    x_label= 't'
+                )
 
     def msd_distribution(self):
         """
@@ -370,7 +393,7 @@ class Measures:
         avg_msd = rowwise_average(msd)
 
         # model selection
-        y_pred, best_fit, best_fit_params, global_params = (
+        y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
             DistributionFitingTools().model_choose(avg_msd)
         )
 
@@ -385,6 +408,13 @@ class Measures:
                 y_label= 'MSD',
                 x_label= 't'
             )
+            if best_fit == 'sigmoid':
+                self.curve_plt(
+                    rowwise_avg=avg_msd,
+                    y_pred= expon_y_pred,
+                    y_label= 'MSD',
+                    x_label= 't'
+                )
 
 
     def return_time_distribution(self):
