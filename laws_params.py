@@ -68,7 +68,11 @@ def main(path):
             data_preproccessing = DataPrepocessing(csv_file)
             data = data_preproccessing.filter_data()
 
-            measures = Measures(data, calc_type='auto')
+            min_label_no = [[value] for index, value in data_preproccessing.statistics.min_labels_no_after_filtration.items()][0][0]
+            min_records_no = [[value] for index, value in data_preproccessing.statistics.min_records_no_before_filtration.items()][0][0]
+
+
+            measures = Measures(data, calc_type='auto', min_label_no = min_label_no, min_records_no = min_records_no)
             measures.calculate_all()
             instance_attributes = [
                 attr for attr in measures.stats.__dict__.keys() if not callable(
