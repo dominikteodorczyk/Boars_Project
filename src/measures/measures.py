@@ -102,7 +102,8 @@ class Measures:
         Plots the visitation frequency if the calc_type is 'jupiter'.
         """
         vf = visitation_frequency(self.clear_data)
-        avg_vf = rowwise_average(vf, row_count=self.min_label_no)
+        # avg_vf = rowwise_average(vf, row_count=self.min_label_no)
+        avg_vf = rowwise_average(vf)
         avg_vf.index = avg_vf.index + 1
         vf.groupby(level=0).size().median()
         avg_vf = avg_vf[~avg_vf.isna()]
@@ -131,8 +132,8 @@ class Measures:
                 self.curve_plt(
                     rowwise_avg=avg_vf,
                     y_pred= expon_y_pred,
-                    y_label= 'MSD',
-                    x_label= 't'
+                    y_label= 'f',
+                    x_label= 'Rank'
                 )
 
 
@@ -144,7 +145,8 @@ class Measures:
         """
 
         dlot = distinct_locations_over_time(self.clear_data)
-        avg_dlot = rowwise_average(dlot, row_count=self.min_label_no)
+        # avg_dlot = rowwise_average(dlot, row_count=self.min_label_no)
+        avg_dlot = rowwise_average(dlot)
         avg_dlot.index += 1
         dlot.groupby(level=0).size().median()
         avg_dlot = avg_dlot[~avg_dlot.isna()]
@@ -173,7 +175,7 @@ class Measures:
                 self.curve_plt(
                     rowwise_avg=avg_dlot,
                     y_pred= expon_y_pred,
-                    y_label= 'MSD',
+                    y_label= 'S(t)',
                     x_label= 't'
                 )
 
@@ -227,7 +229,7 @@ class Measures:
         wt = wt[wt != 0]
 
         # Fit to find the best theoretical distribution
-        model = distfit(stats="RSS")
+        model = distfit(stats="wasserstein")
         model.fit_transform(wt.values)
         logging.info(f'Best fit: {model.model["name"]},{ model.model["params"]}')
 
@@ -267,7 +269,7 @@ class Measures:
         tt = tt[~tt.isna()]
 
         # Fit to find the best theoretical distribution
-        model = distfit(stats="RSS")
+        model = distfit(stats="wasserstein")
         model.fit_transform(tt.values)
         logging.info(f'Best fit: {model.model["name"]},{ model.model["params"]}')
 
@@ -346,8 +348,8 @@ class Measures:
                 self.curve_plt(
                     rowwise_avg=avg_rog,
                     y_pred= expon_y_pred,
-                    y_label= 'MSD',
-                    x_label= 't'
+                    y_label= '',
+                    x_label= 'Values'
                 )
 
     def msd_distribution(self):
@@ -361,7 +363,7 @@ class Measures:
         )
 
         # Fit to find the best theoretical distribution
-        model = distfit(stats="RSS")
+        model = distfit(stats="wasserstein")
         model.fit_transform(msd.values)
         logging.info(f'Best fit: {model.model["name"]},{ model.model["params"]}')
 
@@ -523,7 +525,7 @@ class Measures:
         et = et[et != 0]
 
         # Fit to find the best theoretical distribution
-        model = distfit(stats="RSS")
+        model = distfit(stats="wasserstein")
         model.fit_transform(et.values)
 
         # writing statistics
