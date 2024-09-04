@@ -163,23 +163,38 @@ class DataPrepocessing:
         self.statistics.get_raw_animals_no(self.labels_preprocessed)
         self.statistics.get_raw_period(self.labels_preprocessed)
 
-    def filter_data(self):
+    def filter_above_number(self, min_labels_no=3):
         """
         Filters the preprocessed data by removing rows with missing values
         and selecting users with more than one distinct location.
-
-        Returns:
-        -------
-        TrajectoriesFrame
-            The filtered data ready for further analysis.
         """
+
         self._get_preprocessed_data()
         df_nonaf = self.labels_preprocessed[
             ~self.labels_preprocessed.isna().any(axis=1)
         ]
         dis_loc = num_of_distinct_locations(df_nonaf)
-        # increased number of unique locations to filter to > 2.
-        self.data_to_use = TrajectoriesFrame(df_nonaf.loc[dis_loc[dis_loc > 2].index])
+        self.data_to_use = TrajectoriesFrame(df_nonaf.loc[dis_loc[dis_loc > min_labels_no].index])
+
+    def filter_q1(self):
+
+        self._get_preprocessed_data()
+        df_nonaf = self.labels_preprocessed[
+            ~self.labels_preprocessed.isna().any(axis=1)
+        ]
+        dis_loc = num_of_distinct_locations(df_nonaf)
+        q1 = np.quantile(dis_loc,0.25)
+
+        if q1 < 3:
+            q1 == 3
+
+        self.data_to_use = TrajectoriesFrame(df_nonaf.loc[dis_loc[dis_loc > q1].index])
+
+
+
+    def filter_data(self):
+
+        self.filter_q1()
 
         self.statistics.get_raw_filtered_animals_no(self.data_to_use)
         self.statistics.get_filtered_period(self.data_to_use)
