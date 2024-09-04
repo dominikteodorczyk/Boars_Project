@@ -35,7 +35,14 @@ class Measures:
     stats : MeasurmentsStatistics
         An object to store the statistical results.
     """
-    def __init__(self, clear_data: TrajectoriesFrame, calc_type: str, min_label_no:int, min_records_no:int) -> None:
+    def __init__(
+            self,
+            clear_data: TrajectoriesFrame,
+            calc_type: str,
+            min_label_no:int,
+            min_records_no:int
+            ) -> None:
+
         self.clear_data = clear_data
         self.visitatio_frequency_chart = None
         self.calc_type = calc_type
@@ -102,8 +109,7 @@ class Measures:
         Plots the visitation frequency if the calc_type is 'jupiter'.
         """
         vf = visitation_frequency(self.clear_data)
-        # avg_vf = rowwise_average(vf, row_count=self.min_label_no)
-        avg_vf = rowwise_average(vf)
+        avg_vf = rowwise_average(vf, row_count=self.min_label_no)
         avg_vf.index = avg_vf.index + 1
         vf.groupby(level=0).size().median()
         avg_vf = avg_vf[~avg_vf.isna()]
@@ -145,8 +151,7 @@ class Measures:
         """
 
         dlot = distinct_locations_over_time(self.clear_data)
-        # avg_dlot = rowwise_average(dlot, row_count=self.min_label_no)
-        avg_dlot = rowwise_average(dlot)
+        avg_dlot = rowwise_average(dlot, row_count=self.min_label_no)
         avg_dlot.index += 1
         dlot.groupby(level=0).size().median()
         avg_dlot = avg_dlot[~avg_dlot.isna()]
