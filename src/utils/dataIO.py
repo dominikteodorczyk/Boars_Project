@@ -27,11 +27,7 @@ class DataPrepocessing:
         csv_path : str
             Path to the CSV file containing raw animal trajectory data.
         """
-        self.animal = (
-            csv_path.replace("trajectory_processed\Trajectory_processed_", "")
-            .replace(".csv", "")
-            .replace("_", " ")
-        )
+        self.animal = os.path.basename(csv_path).replace(".csv",'').replace("Trajectory_processed_","").replace("_"," ")
         self.file_name_to_write = os.path.basename(csv_path)
         self.raw_data = pd.read_csv(csv_path)
         self.raw_data["time"] = pd.to_datetime(self.raw_data["time"], unit="s")
