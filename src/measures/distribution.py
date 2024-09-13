@@ -3,6 +3,12 @@ import scipy.stats as stats
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize, curve_fit
 import pandas as pd
+import traceback
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+    )
 
 class Curves:
     """
@@ -203,8 +209,8 @@ class DistributionFitingTools:
                 scores[c] = aicc
                 parameters[c]=params
 
-            except Exception as e:
-                print(e)
+            except ValueError as e:
+                logging.error(e)
                 continue
 
         min_aicc = min(scores,key=scores.get)

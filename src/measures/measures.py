@@ -110,6 +110,7 @@ class Measures:
         """
         vf = visitation_frequency(self.clear_data)
         avg_vf = rowwise_average(vf, row_count=self.min_label_no)
+        # avg_vf = rowwise_average(vf)
         avg_vf.index = avg_vf.index + 1
         vf.groupby(level=0).size().median()
         avg_vf = avg_vf[~avg_vf.isna()]
@@ -152,6 +153,7 @@ class Measures:
 
         dlot = distinct_locations_over_time(self.clear_data)
         avg_dlot = rowwise_average(dlot, row_count=self.min_label_no)
+        # avg_dlot = rowwise_average(dlot)
         avg_dlot.index += 1
         dlot.groupby(level=0).size().median()
         avg_dlot = avg_dlot[~avg_dlot.isna()]
@@ -329,7 +331,7 @@ class Measures:
 
         rog = radius_of_gyration(self.clear_data, time_evolution=True)
         avg_rog = rowwise_average(rog)
-
+        avg_rog = avg_rog[~avg_rog.isna()]
 
         # model selection
         y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
@@ -397,8 +399,8 @@ class Measures:
             time_evolution=True,
             from_center=False
         )
-        avg_msd = rowwise_average(msd)
-
+        avg_msd = rowwise_average(msd, row_count=self.min_records_no)
+        avg_msd = avg_msd[~avg_msd.isna()] #FIXME:
         # model selection
         y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
             DistributionFitingTools().model_choose(avg_msd)
