@@ -27,12 +27,29 @@ class DataPrepocessing:
         csv_path : str
             Path to the CSV file containing raw animal trajectory data.
         """
-        self.animal = os.path.basename(csv_path).replace(".csv",'').replace("Trajectory_processed_","").replace("_"," ")
-        self.file_name_to_write = os.path.basename(csv_path)
+        self.csv_path = csv_path
         self.raw_data = pd.read_csv(csv_path)
+        self.file_name_to_write = os.path.basename(csv_path)
+
+        #SCALING LAWS atributs
+        self.animal = None
+        self.labels_preprocessed = None
+        self.statistics = None
+        self.data_to_use = None
+
+        #INFOSTOP atributs
+        self.parsed_data_to_use = None
+
+    def scaling_laws_prepare(self):
+
+        self.animal = os.path.basename(self.csv_path).replace(".csv",'').replace("Trajectory_processed_","").replace("_"," ")
         self.raw_data["time"] = pd.to_datetime(self.raw_data["time"], unit="s")
         self.labels_preprocessed = None
         self.statistics = AnimalStatistics()
+
+    def infostop_data_prepare(self):
+        pass
+
 
     def _get_mean_points(self):
         """
@@ -210,3 +227,5 @@ class DataPrepocessing:
         self.statistics.get_max_area(self.data_to_use)
 
         return self.data_to_use
+
+
