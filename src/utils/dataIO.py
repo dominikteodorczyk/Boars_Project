@@ -48,7 +48,18 @@ class DataPrepocessing:
         self.statistics = AnimalStatistics()
 
     def infostop_data_prepare(self):
-        pass
+
+        tframes = TrajectoriesFrame(self.raw_data, {'crs': 4326})
+        tframes = tframes.reset_index()[['datetime','user_id','geometry', 'lon', 'lat']]
+        tframes = tframes[tframes['datetime'].notna() & tframes['lon'].notna() & tframes['lat'].notna()]
+        tframes = TrajectoriesFrame(tframes)
+        tframes = tframes.to_crs(dest_crs = 3857, cur_crs = 4326)
+        tframes.columns = ['geometry','lat','lon']
+        tframes = tframes.drop_duplicates()
+
+        self.infostop_stas = None
+
+        self.parsed_data_to_use = TrajectoriesFrame(tframes)
 
 
     def _get_mean_points(self):
@@ -227,5 +238,83 @@ class DataPrepocessing:
         self.statistics.get_max_area(self.data_to_use)
 
         return self.data_to_use
+
+
+class InfoStopData():
+
+    def __init__(self, data):
+        self.clean_data = data
+
+    def data_analyst(self, data:TrajectoriesFrame):
+
+        number_of_animals = data.get_users()
+
+
+    def selecting_best_periods(self):
+        pass
+
+
+    def filtration(self):
+        pass
+
+
+    def sort_by_timestamp(self, data) -> pd.DataFrame:
+        # get data from extraction 2 step and sort them
+        # create a grouped df for sensitivity analyst and infostop calculations
+        pass
+
+
+    def infostop_calculation(self, data, r1, r2, Tmin) -> pd.DataFrame:
+        # create df of data with labels
+        return None
+
+
+    def calculate_all(self, raports:bool=False, infostop_params_manual:bool=False, r1=None, r2=None, Tmin=None):
+
+        self.data_analyst()
+        self.selecting_best_periods()
+        self.data_analyst()
+        self.filtration()
+        self.data_analyst()
+        self.sort_by_timestamp
+        infostop_params = SensitiveAnalyst()
+        self.infostop_calculation()
+        self.write_data()
+        self.write_stats()
+
+
+    def calculate_sensitivity(self):
+
+        self.data_analyst()
+        self.selecting_best_periods()
+        self.data_analyst()
+        self.filtration()
+        self.data_analyst()
+        self.sort_by_timestamp
+        infostop_params = SensitiveAnalyst()
+
+
+
+    def calculate_infostop_with_params(self, raports:bool=False, r1=None, r2=None, Tmin=None):
+
+        self.data_analyst()
+        self.selecting_best_periods()
+        self.data_analyst()
+        self.filtration()
+        self.data_analyst()
+        self.sort_by_timestamp
+        self.infostop_calculation()
+        self.write_data()
+        self.write_stats()
+
+
+
+
+class SensitiveAnalyst():
+
+    def __init__(self):
+        pass
+
+
 
 
