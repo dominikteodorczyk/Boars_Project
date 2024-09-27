@@ -8,7 +8,7 @@ from src.measures.measures import Measures
 
 
 
-DATA_AFTER_INFOSTOP = '...'
+DATA_AFTER_INFOSTOP = '/home/dteodorczyk/Desktop/boars_repo/Boars_Project/test_data/trajctory_processed'
 
 
 logging.basicConfig(
@@ -66,6 +66,7 @@ def main(path):
             animal_data = {}
 
             data_preproccessing = DataPrepocessing(csv_file)
+            data_preproccessing.scaling_laws_prepare()
             data = data_preproccessing.filter_data()
 
             min_label_no = [[value] for index, value in data_preproccessing.statistics.min_labels_no_after_filtration.items()][0][0]
@@ -110,6 +111,7 @@ def main(path):
             animals_data = animals_data._append(animal_data,ignore_index = True)
 
         except Exception as e:
+            logging.error(f"Error durring calculation {csv_file}: {e}")
             animals_data = animals_data._append({
                 'animal' : data_preproccessing.animal.rsplit('\\', 1)[-1],
                 'animal_no':data_preproccessing.statistics.raw_animals_no,
@@ -125,7 +127,7 @@ def main(path):
                 'min_area':data_preproccessing.statistics.min_area,
                 'max_area':data_preproccessing.statistics.max_area
             },ignore_index = True)
-            logging.error(f"Error durring calculation {csv_file}: {e}")
+
 
     animals_data.to_csv('animal_stats.csv')
 
