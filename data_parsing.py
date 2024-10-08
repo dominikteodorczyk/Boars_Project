@@ -9,41 +9,35 @@ values = list of 4 columns to retrieve where the first is the
 
 import json
 import os
-from src.utils.parsers import multi_raw_data_parser
+from src.utils.parsers import parse_data
 
 
 def main() -> None:
     """
-    Main function that loads a JSON configuration file and
-    processes it using the multi_raw_data_parser.
+    Main function that loads a JSON configuration file and processes
+    the data.
 
     The function performs the following steps:
-    1. Loads a JSON file named 'cols.json' located in the 'src/utils'
-        directory relative to the current working directory.
-    2. Passes the loaded data to the `multi_raw_data_parser`
-        function for processing.
+    1. Loads a JSON file named 'cols.json', located in
+        the 'constans' directory
+        relative to the current working directory.
+    2. Uses the `parse_data` function to process the CSV files
+        listed in the JSON file.
+
+    The JSON file should follow the specified format for the
+        column list, where:
+        - The first column is the time.
+        - The second column is the agent ID.
+        - The third and fourth columns are the longitude and latitude
+            coordinates.
 
     Example:
-        Assuming `cols.json` contains valid JSON data, running
-        this script will parse the data using the `multi_raw_data_parser`.
+        Assuming the JSON file at 'constans/cols.json' contains valid data,
+        running this script will parse the corresponding CSV files and save
+        the processed results.
 
-    Returns:
-        None
     """
-    data_dict = json.load(
-        open(
-            os.path.join(
-                os.getcwd(),
-                'src',
-                'utils',
-                'cols.json'
-                )
-            )
-        )
-
-    multi_raw_data_parser(
-        data_dict=data_dict
-        )
+    parse_data(json_source='constans/cols.json')
 
 
 if __name__ == "__main__":
