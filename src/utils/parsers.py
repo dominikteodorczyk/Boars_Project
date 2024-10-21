@@ -54,11 +54,8 @@ def parse_id(dataframe:pd.DataFrame, cols:list) -> pd.DataFrame:
         dataframe[cols[1]] = dataframe[cols[1]].astype(str)
         dataframe = dataframe[~dataframe[cols[1]].apply(test_data_detector)]
         dataframe[cols[1]] = dataframe[cols[1]].map(
-            {k:v for k,v in enumerate(
-                dataframe[cols[1]].unique()
-                )
-            }
-        )
+            {val: num for num, val in enumerate(dataframe[cols[1]].unique())}
+            )
         return dataframe
     except Exception as e:
         logging.error(f'ID parser error: {e}')
@@ -107,6 +104,9 @@ def data_structuring(dataframe:pd.DataFrame) -> pd.DataFrame:
     """
     try:
         dataframe.columns = ['datetime','user_id','lon', 'lat']
+        dataframe.groupby('user_id', group_keys=False).apply(
+            lambda x: x.sort_values('datetime')
+            )
         return dataframe.reset_index(drop=True)
     except Exception as e:
         logging.error(f'Data structuring error: {e}')
