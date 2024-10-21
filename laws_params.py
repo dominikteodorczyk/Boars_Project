@@ -8,7 +8,7 @@ from src.measures.measures import Measures
 
 
 
-DATA_AFTER_INFOSTOP = '/home/dteodorczyk/Desktop/boars_repo/Boars_Project/test_data/trajctory_processed'
+DATA_AFTER_INFOSTOP = '...'
 
 
 logging.basicConfig(
