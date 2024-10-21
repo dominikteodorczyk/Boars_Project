@@ -227,10 +227,10 @@ class Measures:
         """
         try:
             wt = self.clear_data.groupby(level=0).apply(
-                lambda x: (x.end - x.start).dt.total_seconds()
+                lambda x: (x.end - x.start).dt.total_seconds().round()
             )
         except:
-            wt = (self.clear_data['end'] - self.clear_data['start']).dt.total_seconds()
+            wt = (self.clear_data['end'] - self.clear_data['start']).dt.total_seconds().round()
 
         wt = wt[~wt.isna()]
         wt = wt[wt != 0]
