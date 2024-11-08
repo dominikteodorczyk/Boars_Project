@@ -1,3 +1,4 @@
+from numpy import size
 import pandas as pd
 import os
 import logging
@@ -6,6 +7,10 @@ from humobi.measures.individual import *
 from humobi.tools.processing import *
 from humobi.tools.user_statistics import *
 from src.measures.stats import AnimalStatistics
+from fpdf import FPDF
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set_style("whitegrid")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,9 +62,9 @@ class DataPrepocessing:
         tframes.columns = ['geometry','lat','lon']
         tframes = tframes.drop_duplicates()
 
-        self.infostop_stas = None
+        self.infostop_stats = None
 
-        self.parsed_data_to_use = TrajectoriesFrame(tframes)
+        return TrajectoriesFrame(tframes), self.file_name_to_write.replace('parsed_','').replace('.csv','')
 
 
     def _get_mean_points(self):
@@ -73,6 +78,7 @@ class DataPrepocessing:
             A DataFrame with mean points for each label of each user, sorted
             by datetime and with duplicates removed.
         """
+
         self.statistics.get_min_records_no_before_filtration(self.raw_data)
         _df = TrajectoriesFrame(
             self.raw_data,
@@ -214,7 +220,7 @@ class DataPrepocessing:
         q1 = np.quantile(dis_loc,0.25)
 
         if q1 < 3:
-            q1 == 3
+            q1 = 3
 
         self.data_to_use = TrajectoriesFrame(df_nonaf.loc[dis_loc[dis_loc > q1].index])
 
@@ -240,80 +246,6 @@ class DataPrepocessing:
         return self.data_to_use
 
 
-class InfoStopData():
-
-    def __init__(self, data):
-        self.clean_data = data
-
-    def data_analyst(self, data:TrajectoriesFrame):
-
-        number_of_animals = data.get_users()
-
-
-    def selecting_best_periods(self):
-        pass
-
-
-    def filtration(self):
-        pass
-
-
-    def sort_by_timestamp(self, data) -> pd.DataFrame:
-        # get data from extraction 2 step and sort them
-        # create a grouped df for sensitivity analyst and infostop calculations
-        pass
-
-
-    def infostop_calculation(self, data, r1, r2, Tmin) -> pd.DataFrame:
-        # create df of data with labels
-        return None
-
-
-    def calculate_all(self, raports:bool=False, infostop_params_manual:bool=False, r1=None, r2=None, Tmin=None):
-
-        self.data_analyst()
-        self.selecting_best_periods()
-        self.data_analyst()
-        self.filtration()
-        self.data_analyst()
-        self.sort_by_timestamp
-        infostop_params = SensitiveAnalyst()
-        self.infostop_calculation()
-        self.write_data()
-        self.write_stats()
-
-
-    def calculate_sensitivity(self):
-
-        self.data_analyst()
-        self.selecting_best_periods()
-        self.data_analyst()
-        self.filtration()
-        self.data_analyst()
-        self.sort_by_timestamp
-        infostop_params = SensitiveAnalyst()
-
-
-
-    def calculate_infostop_with_params(self, raports:bool=False, r1=None, r2=None, Tmin=None):
-
-        self.data_analyst()
-        self.selecting_best_periods()
-        self.data_analyst()
-        self.filtration()
-        self.data_analyst()
-        self.sort_by_timestamp
-        self.infostop_calculation()
-        self.write_data()
-        self.write_stats()
-
-
-
-
-class SensitiveAnalyst():
-
-    def __init__(self):
-        pass
 
 
 
