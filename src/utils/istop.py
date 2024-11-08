@@ -20,26 +20,41 @@ logging.basicConfig(
 
 class DataAnalystInfostop:
     """
-    Initializes the DataAnalysisReport with a PDF instance.
+    A class responsible for generating data analysis reports in PDF format.
 
-    Args:
-        pdf_object (FPDF): PDF instance where the analysis
-            results will be written.
+    Parameters
+    ----------
+    pdf_object : FPDF
+        PDF instance to which the analysis results will be added.
     """
     def __init__(self, pdf_object) -> None:
+        """
+        Initializes the DataAnalystInfostop with a given PDF instance.
+
+        Parameters
+        ----------
+        pdf_object : FPDF
+            PDF instance where analysis results will be written.
+        """
         self.pdf_object = pdf_object
+
 
     def generate_raport(self, data, data_analyst_no: int):
         """
-        Generates a data analysis report, adding results to the PDF.
+        Generates a data analysis report, adding results and visualizations
+        to the PDF.
 
-        Args:
-            data (TrajectoriesFrame): Input data for analysis.
-            data_analyst_no (int): Analysis number, used in titles and file names.
+        Parameters
+        ----------
+        data : TrajectoriesFrame
+            Input data for analysis.
+        data_analyst_no : int
+            Analysis identifier used in titles and filenames.
 
-        Description:
-            Runs a complete data analysis pipeline, sequentially generating statistics
-            and plots and adding them to the PDF instance.
+        Notes
+        -----
+        Executes a data analysis pipeline, generating various statistical
+        metrics and plots, which are sequentially added to the PDF document.
         """
         self._add_analyst_title(data_analyst_no)
         self._add_basic_statistics(data, data_analyst_no)
@@ -55,6 +70,14 @@ class DataAnalystInfostop:
 
 
     def _add_pdf_cell(self,txt_to_add:str):
+        """
+        Adds a single line of text to the PDF.
+
+        Parameters
+        ----------
+        txt_to_add : str
+            Text to be added to the PDF document.
+        """
         self.pdf_object.cell(200, 5, txt=txt_to_add, ln=True, align='L')
 
     def _add_pdf_plot(
@@ -64,7 +87,20 @@ class DataAnalystInfostop:
             image_height,
             x_position=10
             ):
+        """
+        Adds a plot to the PDF at the current cursor position.
 
+        Parameters
+        ----------
+        plot_obj : BytesIO
+            Plot image to add to the PDF.
+        image_width : int
+            Width of the plot in the PDF.
+        image_height : int
+            Height of the plot in the PDF.
+        x_position : int, optional
+            X-coordinate position of the plot, by default 10.
+        """
         y_position = self.pdf_object.get_y()
         self.pdf_object.image(
             plot_obj,
@@ -77,7 +113,21 @@ class DataAnalystInfostop:
 
 
     def _plot_fraction_of_empty_records(self, frac, data_analyst_no):
+        """
+        Generates a plot showing the fraction of empty records by threshold.
 
+        Parameters
+        ----------
+        frac : Series
+            Series containing fraction of empty records.
+        data_analyst_no : int
+            Analysis identifier for the plot filename.
+
+        Returns
+        -------
+        BytesIO
+            In-memory image buffer of the generated plot.
+        """
         thresholds = [round(i, 2) for i in np.arange(0.01, 1.01, 0.01)]
         num_of_complete = {
             threshold: (frac <= threshold).sum() for threshold in thresholds
@@ -106,7 +156,23 @@ class DataAnalystInfostop:
             plot_name,
             bins=10
             ):
+        """
+        Generates a distribution plot of the given data.
 
+        Parameters
+        ----------
+        data : Series or array-like
+            Data to plot.
+        plot_name : str
+            Filename for saving the plot.
+        bins : int, optional
+            Number of bins for the histogram, by default 10.
+
+        Returns
+        -------
+        BytesIO
+            In-memory image buffer of the generated distribution plot.
+        """
         buffer = BytesIO()
         sns.displot(
             data,
@@ -121,10 +187,29 @@ class DataAnalystInfostop:
 
 
     def _add_analyst_title(self, data_analyst_no):
+        """
+        Adds the title of the analysis section to the PDF.
+
+        Parameters
+        ----------
+        data_analyst_no : int
+            Analysis identifier used in the title.
+        """
         self._add_pdf_cell(f"Data Analysis: {data_analyst_no}")
 
 
     def _add_basic_statistics(self, data, data_analyst_no):
+        """
+        Adds basic statistics to the PDF, including the number of animals and
+        fraction of empty records.
+
+        Parameters
+        ----------
+        data : TrajectoriesFrame
+            Input data for analysis.
+        data_analyst_no : int
+            Analysis identifier.
+        """
         number_of_animals = len(data.get_users())
         self._add_pdf_cell(f"Number of animals: {number_of_animals}")
 
@@ -147,7 +232,17 @@ class DataAnalystInfostop:
 
 
     def _add_total_records_statistics(self, data, data_analyst_no):
+        """
+        Adds total record statistics to the PDF, including median
+        and mean values.
 
+        Parameters
+        ----------
+        data : TrajectoriesFrame
+            Input data for analysis.
+        data_analyst_no : int
+            Analysis identifier.
+        """
         count = count_records(data)
         count_median = count.median()
         count_mean = count.mean()
@@ -169,7 +264,18 @@ class DataAnalystInfostop:
 
 
     def _add_records_per_time_frame(self, data, data_analyst_no, resolution):
+        """
+        Adds statistics on records per specified time frame to the PDF.
 
+        Parameters
+        ----------
+        data : TrajectoriesFrame
+            Input data for analysis.
+        data_analyst_no : int
+            Analysis identifier.
+        resolution : str
+            Time resolution for analysis (e.g., '1D', '1H').
+        """
         count_per_time_frame = count_records_per_time_frame(
             data,
             resolution=resolution
@@ -202,7 +308,18 @@ class DataAnalystInfostop:
 
 
     def _add_trajctories_duration(self, data, data_analyst_no, resolution):
+        """
+        Adds trajectory duration statistics to the PDF.
 
+        Parameters
+        ----------
+        data : TrajectoriesFrame
+            Input data for analysis.
+        data_analyst_no : int
+            Analysis identifier.
+        resolution : str
+            Time resolution for trajectory duration (e.g., '1H').
+        """
         trajectories_duration_1H = user_trajectories_duration(
             data,
             resolution=resolution,
@@ -220,25 +337,53 @@ class DataAnalystInfostop:
         self._add_pdf_plot(plot_obj,60,60)
 
 
-    def _add_no_of_consecutive_records(self, data, data_analyst_no, resolution):
+    def _add_no_of_consecutive_records(
+            self,
+            data,
+            data_analyst_no,
+            resolution
+            ):
+        """
+        Adds statistics on consecutive records to the PDF.
 
+        Parameters
+        ----------
+        data : TrajectoriesFrame
+            Input data for analysis.
+        data_analyst_no : int
+            Analysis identifier.
+        resolution : str
+            Time resolution for consecutive records analysis (e.g., '1H').
+        """
         consecutive_1h = consecutive_record(data, resolution=resolution)
         consecutive_1h_median = consecutive_1h.median()
 
-        self._add_pdf_cell(f"The median of consecutive records ({resolution}): "
-                           f"{consecutive_1h_median}")
+        self._add_pdf_cell(f"Median of consecutive records ({resolution}):"
+                           f" {consecutive_1h_median}")
 
         plot_obj = self._plot_distribution(
             data=consecutive_1h,
             plot_name=f"Data Analysis {data_analyst_no}: "
-                    f"The distribution of consecutive records ({resolution}).png"
+                    f"Distribution of consecutive records ({resolution}).png"
                         )
         self._add_pdf_plot(plot_obj,60,60)
 
 
     def _add_average_temporal_resolution(self, data, data_analyst_no):
-        # temporal_df = data.reset_index(level=1)
-        temporal_df = data.reset_index(level=1).groupby(level=0).apply(lambda x: x.datetime - x.datetime.shift())
+        """
+        Adds average temporal resolution statistics to the PDF.
+
+        Parameters
+        ----------
+        data : TrajectoriesFrame
+            Input data for analysis, which includes datetime information
+            required to calculate temporal resolution.
+        data_analyst_no : int
+            Analysis identifier used in plot filenames.
+        """
+        temporal_df = data.reset_index(level=1).groupby(level=0).apply(
+            lambda x: x.datetime - x.datetime.shift()
+            )
         temporal_df_median = temporal_df.median()
         temp_res_animal = temporal_df.groupby(level=0).median()
         in_minutes = temporal_df[~temporal_df.isna()].dt.total_seconds()/60
@@ -272,7 +417,7 @@ class InfoStopData():
         self.pdf.cell(
             200,
             10,
-            txt=f"{self.animal_name}",
+            txt = f"{self.animal_name}",
             ln=True,
             align='C'
             )
