@@ -63,10 +63,12 @@ class DataAnalystInfostop:
         self._add_total_records_statistics(data, data_analyst_no)
         self._add_records_per_time_frame(data, data_analyst_no, '1D')
         self.pdf_object.add_page()
+
         self._add_records_per_time_frame(data, data_analyst_no, '1H')
         self._add_trajctories_duration(data, data_analyst_no, '1H')
         self._add_no_of_consecutive_records(data, data_analyst_no, '1H')
         self.pdf_object.add_page()
+
         self._add_no_of_consecutive_records(data, data_analyst_no, '1D')
         self._add_average_temporal_resolution(data, data_analyst_no)
         self.pdf_object.add_page()
@@ -444,12 +446,16 @@ class DataFilter:
             if an_val.isna().all():
                 continue
             max_date = an_val.idxmax()[1]
-            till_EOD = pd.to_datetime(max_date.date() + pd.Timedelta(days=1)) - max_date
+            till_EOD = pd.to_datetime(
+                max_date.date() + pd.Timedelta(days=1)
+                ) - max_date
             max_date += till_EOD
             an_val = an_val.reset_index()
             min_date = max_date - pd.Timedelta(days=self.day_window)
             cur_df = data.loc[an_id].reset_index()
-            selected = cur_df[(cur_df['datetime'] <= max_date) & (cur_df['datetime'] >= min_date)]
+            selected = cur_df[
+                (cur_df['datetime'] <= max_date) & (cur_df['datetime'] >= min_date)
+                ]
 
             selected['user_id'] = an_id
             selected = selected.set_index(['user_id','datetime'])
@@ -458,7 +464,9 @@ class DataFilter:
         return pd.concat(extracted)
 
     def _convert_to_unix(self, group):
-        group['time'] = group['time'].apply(lambda x: int(pd.to_datetime(x).timestamp()))
+        group['time'] = group['time'].apply(
+            lambda x: int(pd.to_datetime(x).timestamp())
+            )
         return group
 
     def select_best_period(self, data):
@@ -466,19 +474,22 @@ class DataFilter:
             lambda x: x.datetime - x.datetime.shift()
             )
         temporal_df_median = temporal_df.median()
-        average_temp_res_str, average_temp_res_int = self._match_timedelta(temporal_df_median)
-        resampled_data = data.groupby(level=0).resample(average_temp_res_str, level=1).count().iloc[:,0]
+        avg_temp_res_str, avg_temp_res_int = self._match_timedelta(temporal_df_median)
+        resampled = data.groupby(level=0).resample(avg_temp_res_str, level=1).count().iloc[:,0]
 
-        check_time = self._select_time_window(average_temp_res_int)
-        resampled_data[resampled_data > 1] = 1
-        data_coverage = resampled_data.groupby(level=0).apply(lambda x: x.rolling(check_time).sum()/check_time)
+        check_time = self._select_time_window(avg_temp_res_int)
+        resampled[resampled > 1] = 1
+        data_coverage = resampled.groupby(level=0).apply(
+            lambda x: x.rolling(check_time).sum()/check_time
+            )
         extracted = self._extract_best_coverage(data, data_coverage)
 
         self._add_pdf_cell("Selecting best periods - maximising data coverage")
-        self._add_pdf_cell(f"Average temporal resolution: {temporal_df_median}")
-        self._add_pdf_cell(f"Resample value (str): {average_temp_res_str}")
-        self._add_pdf_cell(f"Resample value (int): {average_temp_res_int}")
-        self._add_pdf_cell(f"Selected time window for {self.day_window} days (timecheck): {check_time}")
+        self._add_pdf_cell(f"Avg temporal resolution: {temporal_df_median}")
+        self._add_pdf_cell(f"Resample value (str): {avg_temp_res_str}")
+        self._add_pdf_cell(f"Resample value (int): {avg_temp_res_int}")
+        self._add_pdf_cell(f"Selected time window for {self.day_window} "
+                           f"days (timecheck): {check_time}")
         self.pdf_object.add_page()
 
         return TrajectoriesFrame(extracted)
@@ -487,7 +498,7 @@ class DataFilter:
         temporal_df = data.reset_index(level=1).groupby(level=0).apply(
             lambda x: x.datetime - x.datetime.shift()
             )
-        temp_res_animal_extr = temporal_df.groupby(level=0).median()
+        temp_res_animal_ex = temporal_df.groupby(level=0).median()
 
         # FRACTION OF MISSING RECORDS < 0.6
         frac_filtr = fraction_of_empty_records(data, '1H')
@@ -497,7 +508,7 @@ class DataFilter:
         traj_dur_filtr = user_trajectories_duration(data, '1D')
         level2 = set(traj_dur_filtr[traj_dur_filtr > 20].index)
 
-        level3 = set(temp_res_animal_extr[temp_res_animal_extr <= '30min'].index)
+        level3 = set(temp_res_animal_ex[temp_res_animal_ex <= '30min'].index)
 
         # USER FILTRATION WITH ULOC METHOD
         selection_lvl2 = level1.intersection(level2)
@@ -515,10 +526,11 @@ class DataFilter:
         self._add_pdf_cell(f"Min duration: {traj_dur_filtr.min()}")
 
         self._add_pdf_cell(f"Number of animals on level 3: {len(level3)}")
-        self._add_pdf_cell(f"Max temp res: {temp_res_animal_extr.max()}")
-        self._add_pdf_cell(f"Min temp res: {temp_res_animal_extr.min()}")
+        self._add_pdf_cell(f"Max temp res: {temp_res_animal_ex.max()}")
+        self._add_pdf_cell(f"Min temp res: {temp_res_animal_ex.min()}")
 
-        self._add_pdf_cell(f"TOTAL FILTRED ANIMALS: {len(filtred_data.get_users())}")
+        self._add_pdf_cell(f"TOTAL FILTRED ANIMALS: "
+                           f"{len(filtred_data.get_users())}")
 
         self.pdf_object.add_page()
 
@@ -650,8 +662,6 @@ class LabelsCalc:
                             except Exception as e:
                                 print(f"Error processing user {user_id}: {e}")
 
-        self._add_pdf_cell("Sensitivity analyst for serching right parameters for infostop")
-        pd.DataFrame(dfs_list).to_csv('sensitivity_matrix.csv')
         return pd.DataFrame(dfs_list)
 
 
@@ -689,7 +699,7 @@ class LabelsCalc:
     def _choose_param_value(self, data, param):
 
         if param == 'R1':
-            result_df = data[(data['R1'] >= 50) & (data['R1'] <= 1000)]
+            data = data[(data['R1'] >= 50) & (data['R1'] <= 1000)]
         if param == 'Tmin':
             data = data[(data['Tmin'] >= 600) & (data['Tmin'] <= 3600)]
 
@@ -705,14 +715,14 @@ class LabelsCalc:
 
         dxdy = pd.DataFrame({'de_value': np.abs(dy_dx)}).sort_values(by='de_value')
         stabilization_x = x[dxdy.index[:5]]
-        filtred = result_df[result_df[param].isin(stabilization_x)]
+        filtred = data[data[param].isin(stabilization_x)]
         suma_total_stops = filtred.groupby(param)['Total_stops'].sum()
         stabilization_point_index = suma_total_stops.idxmax()
 
         plot_obj = self._plot_param(param,stabilization_point_index,x,y,dy_dx)
 
-        self._add_pdf_cell(f"R1 value: {stabilization_point_index}")
-        self._add_pdf_plot(plot_obj,100,60)
+        self._add_pdf_cell(f"{param} value: {stabilization_point_index}")
+        self._add_pdf_plot(plot_obj,200,150)
 
         return stabilization_point_index
 
@@ -720,6 +730,7 @@ class LabelsCalc:
     def choose_best_params(self, sensitivity_matrix):
         r1 = self._choose_param_value(sensitivity_matrix, 'R1')
         r2 = self._choose_param_value(sensitivity_matrix, 'R2')
+        self.pdf_object.add_page()
         Tmin = self._choose_param_value(sensitivity_matrix, 'Tmin')
 
         return r1, r2, Tmin
@@ -745,6 +756,7 @@ class LabelsCalc:
         return pd.concat(results, ignore_index=True)
 
     def calculate_infostop(self, data):
+        self._add_pdf_cell("Infostop calculations")
         sensitivity_matrix = self.calc_params_matrix(data)
         r1, r2, Tmin = self.choose_best_params(sensitivity_matrix)
         final_data = self.calc_labels(data, r1, r2, Tmin)
