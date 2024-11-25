@@ -1,16 +1,42 @@
 """
-Data parsing script. As a configuration file it uses a json file
-with the structure:
-key = path to csv file,
-values = list of 4 columns to retrieve where the first is the
-    time column, the second is the agent id and then coordinates
-"""
+Data Parsing Script
 
+This script processes CSV files using a JSON configuration file that specifies
+the mapping between CSV files and the columns to retrieve.
+
+The JSON configuration file must have the following structure:
+    {
+        "path/to/csv_file.csv": [
+            "time_column",
+            "agent_id_column",
+            "longitude_column",
+            "latitude_column"
+        ],
+        ...
+    }
+
+Each key is the path to a CSV file, and its value is a list specifying the
+columns to retrieve. The list must include:
+    - The time column (as the first entry).
+    - The agent ID column (as the second entry).
+    - The longitude and latitude columns (as the third and fourth entries).
+
+The script loads the JSON configuration file, parses the data from
+the specified CSV files, and processes it using the `parse_data` function
+from `src.utils.parsers`.
+
+Usage:
+    - Place the configuration JSON path in COLUMNS_SOURCE.
+    - Ensure all paths to CSV files are correctly specified and accessible.
+    - Run this script to process the data based on the configuration.
+"""
 
 import json
 import os
 from src.utils.parsers import parse_data
 
+
+JSON_CONFIG_FILE = '' ## put here path to JSON configuration file
 
 def main() -> None:
     """
@@ -18,9 +44,7 @@ def main() -> None:
     the data.
 
     The function performs the following steps:
-    1. Loads a JSON file named 'cols.json', located in
-        the 'constans' directory
-        relative to the current working directory.
+    1. Loads a JSON file,
     2. Uses the `parse_data` function to process the CSV files
         listed in the JSON file.
 
@@ -32,12 +56,12 @@ def main() -> None:
             coordinates.
 
     Example:
-        Assuming the JSON file at 'constans/cols.json' contains valid data,
+        Assuming the JSON file contains valid data,
         running this script will parse the corresponding CSV files and save
         the processed results.
 
     """
-    parse_data(json_source='constans/cols.json')
+    parse_data(json_source=COLUMNS_SOURCE)
 
 
 if __name__ == "__main__":
