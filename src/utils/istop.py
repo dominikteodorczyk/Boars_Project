@@ -1,3 +1,4 @@
+import time
 from typing import final
 from numpy import size
 import pandas as pd
@@ -9,7 +10,9 @@ from humobi.tools.processing import *
 from humobi.tools.user_statistics import *
 from src.measures.stats import AnimalStatistics
 from fpdf import FPDF
-import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib import pyplot as plt
 import seaborn as sns
 from io import BytesIO
 sns.set_style("whitegrid")
@@ -17,9 +20,10 @@ from infostop import Infostop
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-from concurrent.futures import ProcessPoolExecutor
-from joblib import Parallel, delayed
+from multiprocessing import Pool
+from itertools import product
 import gc
+from concurrent.futures import ThreadPoolExecutor
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -636,59 +640,58 @@ class LabelsCalc:
             final_trajectory.append([loc_prev, lat, lon, t_start, t_end])
         return final_trajectory
 
-    def _process_user(self, user_data):
-        user_id, group, rs1, rs2, min_staying_times = user_data
-        dfs_list = []
-        group = group.sort_values('time')
-        data = group[['latitude', 'longitude', 'time']].values
-        for r1 in rs1:
-            for r2 in rs2:
-                for min_staying_time in min_staying_times:
-                    model = Infostop(
-                        r1=r1,
-                        r2=r2,
-                        label_singleton=False,
-                        min_staying_time=min_staying_time,
-                        max_time_between=86400,
-                        min_size=2
-                    )
-                    try:
-                        labels = model.fit_predict(data)
-                        trajectory = self._compute_intervals(labels, data)
-                        trajectory = pd.DataFrame(trajectory, columns=['labels', 'lat', 'lon', 'start', 'end'])
-                        trajectory = trajectory[trajectory.labels != -1]
+    def process_combination(self, args):
+        user_id, group, r1, r2, min_staying_time = args
 
-                        total_stops = len(np.unique(labels))
-                        results = {
-                            'animal_id': user_id,
-                            'Trajectory': trajectory,
-                            'Total_stops': total_stops,
-                            'R1': r1,
-                            'R2': r2,
-                            'Tmin': min_staying_time
-                        }
-                        dfs_list.append(results)
-                    except Exception as e:
-                        print(f"Error processing user {user_id}: {e}")
-        return dfs_list
+        try:
+            group = group.sort_values('time')
+            data = group[['latitude', 'longitude', 'time']].values
+            model = Infostop(
+                r1=r1,
+                r2=r2,
+                label_singleton=False,
+                min_staying_time=min_staying_time,
+                max_time_between=86400,
+                min_size=2
+            )
 
-    def calc_params_matrix2(self, data):
+            labels = model.fit_predict(data)
+            trajectory = self._compute_intervals(labels, data)
+            trajectory = pd.DataFrame(trajectory, columns=['labels', 'lat', 'lon', 'start', 'end'])
+            trajectory = trajectory[trajectory.labels != -1]
+
+            total_stops = len(np.unique(labels))
+            results = {
+                'animal_id': user_id,
+                'Trajectory': trajectory,
+                'Total_stops': total_stops,
+                'R1': r1,
+                'R2': r2,
+                'Tmin': min_staying_time
+            }
+            return results
+
+        except Exception as e:
+            print(f"Error processing user {user_id}: {e}")
+            return None
+
+
+    def calc_params_matrix_parallel(self, data):
+        import csv
+
         rs1 = np.logspace(1, 2, 20, base=50)
         rs2 = np.logspace(1, 2, 20, base=50)
         min_staying_times = np.logspace(np.log10(600), np.log10(7200), num=20)
 
-        user_data_list = [(user_id, group, rs1, rs2, min_staying_times) for user_id, group in data]
+        tasks = []
+        for user_id, group in tqdm(data, total=len(data)):
+            for r1, r2, min_staying_time in product(rs1, rs2, min_staying_times):
+                tasks.append((user_id, group, r1, r2, min_staying_time))
 
-        results = []
-        # with ProcessPoolExecutor(max_workers=8) as executor:
-        #     for dfs in tqdm(executor.map(self._process_user, user_data_list), total=len(user_data_list)):
-        #         results.extend(dfs)
+        with Pool() as pool:
+            results = list(tqdm(pool.imap(self.process_combination, tasks), total=len(tasks)))
 
-        gc.collect()
-        results = Parallel(n_jobs=-1)(
-            delayed(self._process_user)(user_data) for user_data in user_data_list
-        )
-
+        results = [res for res in results if res is not None]
         return pd.DataFrame(results)
 
 
@@ -744,10 +747,10 @@ class LabelsCalc:
         ax1.axhline(0, color='black', linestyle='--', linewidth=1)
 
         ax2 = ax1.twinx()
-        ax2.plot(x, dy_dx, label='First derivate', color='red', linewidth=2, linestyle='-')
-        ax2.axhline(0, color='red', linestyle='--', linewidth=1, label='Zero line (dy/dx)')
+        ax2.plot(x, dy_dx, label='Change', color='red', linewidth=2, linestyle='-')
+        ax2.axhline(0, color='red', linestyle='--', linewidth=1)
 
-        ax2.set_ylabel('First derivative')
+        ax2.set_ylabel('Change')
 
         for a, b in zip(x, dy_dx):
             ax2.text(a, b, str(round(b, 5)), ha='center', va='bottom', color='red')
@@ -828,7 +831,7 @@ class LabelsCalc:
 
     def calculate_infostop(self, data):
         self._add_pdf_cell("Infostop calculations")
-        sensitivity_matrix = self.calc_params_matrix(data)
+        sensitivity_matrix = self.calc_params_matrix_parallel(data)
         r1, r2, Tmin = self.choose_best_params(sensitivity_matrix)
         final_data = self.calc_labels(data, r1, r2, Tmin)
         self._add_pdf_cell(f"Final number of animals: {final_data['animal_id'].nunique()}")
@@ -841,10 +844,11 @@ class InfoStopData():
     def __init__(self, data, data_name, output_dir):
         self.clean_data = data
         self.animal_name = data_name
-        self.output_dir = os.path.join(output_dir,data_name)
+        self.output_dir = output_dir
+        self.output_dir_animal = os.path.join(output_dir,data_name)
         self.pdf = FPDF()
 
-        os.mkdir(self.output_dir)
+        os.mkdir(self.output_dir_animal)
 
         self.pdf.add_page()
         self.pdf.set_font("Arial", size=9)
@@ -860,19 +864,19 @@ class InfoStopData():
 
     def calculate_all(self, raports:bool=False, infostop_params_manual:bool=False, r1=None, r2=None, Tmin=None):
 
-        raport = DataAnalystInfostop(self.pdf,self.output_dir)
+        raport = DataAnalystInfostop(self.pdf,self.output_dir_animal)
         data_filter = DataFilter(self.pdf)
-        labels_calculator = LabelsCalc(self.pdf,self.output_dir)
+        labels_calculator = LabelsCalc(self.pdf,self.output_dir_animal)
+        try:
+            raport.generate_raport(data = self.clean_data, data_analyst_no=1)
+            extracted_data = data_filter.select_best_period(data=self.clean_data)
+            raport.generate_raport(data = extracted_data, data_analyst_no=2)
+            filtred_data = data_filter.filter_data(data=extracted_data)
+            raport.generate_raport(data = filtred_data, data_analyst_no=3)
+            sorted_data = data_filter.sort_data(filtred_data)
+            trajectory_processed_data = labels_calculator.calculate_infostop(sorted_data)
 
-        raport.generate_raport(data = self.clean_data, data_analyst_no=1)
-        extracted_data = data_filter.select_best_period(data=self.clean_data)
-        raport.generate_raport(data = extracted_data, data_analyst_no=2)
-        filtred_data = data_filter.filter_data(data=extracted_data)
-        raport.generate_raport(data = filtred_data, data_analyst_no=3)
-        sorted_data = data_filter.sort_data(filtred_data)
-        trajectory_processed_data = labels_calculator.calculate_infostop(sorted_data)
-
-        trajectory_processed_data.to_csv(os.path.join(self.output_dir, f'Trajectory_processed_{self.animal_name}.csv'))
-
-
-        self.pdf.output(os.path.join(self.output_dir, f"{self.animal_name}.pdf"))
+            trajectory_processed_data.to_csv(os.path.join(self.output_dir, f'Trajectory_processed_{self.animal_name}.csv'))
+            self.pdf.output(os.path.join(self.output_dir_animal, f"{self.animal_name}.pdf"))
+        except:
+            self.pdf.output(os.path.join(self.output_dir_animal, f"{self.animal_name}.pdf"))
