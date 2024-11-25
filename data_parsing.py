@@ -61,7 +61,7 @@ def main() -> None:
         the processed results.
 
     """
-    parse_data(json_source=COLUMNS_SOURCE)
+    parse_data(json_source=JSON_CONFIG_FILE)
 
 
 if __name__ == "__main__":
