@@ -25,5 +25,10 @@
     "White_bearded_wildebeest.csv":["timestamp","individual-local-identifier", "location-long", "location-lat"],
     "White_stork_ Ciconidae_Western_Poland.csv":["timestamp","tag-local-identifier", "location-long", "location-lat"],
     "Missouri_Bison.csv":["timestamp","tag-local-identifier", "location-long", "location-lat"],
-    "Aromas_Hills_Bobcat.csv":["timestamp","individual-local-identifier", "location-long", "location-lat"]
+    "Aromas_Hills_Bobcat.csv":["timestamp","individual-local-identifier", "location-long", "location-lat"],
+    "Brown_pelican.csv":["timestamp","individual_local_id", "lon", "lat"],
+    "Deer_Florida.csv":["timestamp","individual_local_id", "lon", "lat"],
+    "Humpback_whales.csv":["timestamp","individual_local_id", "lon", "lat"],
+    "Juvenile_emperor_penguin.csv":["timestamp","individual_local_id", "lon", "lat"],
+    "Sea_turtles_Japan.csv":["timestamp","individual_local_id", "lon", "lat"]
 }
