@@ -31,8 +31,12 @@ python process_data.py
 import os
 import traceback
 import logging
-from numpy import info
-from src.utils.dataIO import DataPrepocessing, DataIO
+from src.utils.dataIO import (
+    DataPrepocessing,
+    DataIO,
+    get_file_paths,
+    create_output_directory
+)
 from src.utils.istop import InfoStopData
 
 logging.basicConfig(
@@ -42,47 +46,6 @@ logging.basicConfig(
 # Define the directory containing parsed data files
 PARSED_DATA_DIR = ''
 OUTPUT_DIR_NAME = 'infostop_output'
-
-
-def get_file_paths(directory:str) -> list:
-    """
-    Retrieves a list of file paths from a given directory.
-
-    Args:
-        directory (str): The path to the directory containing the files.
-
-    Returns:
-        list: A list of full file paths to all files in the directory.
-    """
-    return [
-        os.path.join(directory, file)
-        for file in os.listdir(directory)
-        if os.path.isfile(os.path.join(directory, file))
-    ]
-
-
-def create_output_directory(base_path:str, dir_name: str) -> str:
-    """
-    Creates an output directory if it does not already exist.
-
-    Args:
-        base_path (str): The base path where the directory should be created.
-        dir_name (str): The name of the output directory.
-
-    Returns:
-        str: The full path to the created directory.
-
-    Raises:
-        OSError: If the directory cannot be created due to system errors.
-    """
-    output_path = os.path.join(base_path, dir_name)
-    if not os.path.exists(output_path):
-        try:
-            os.mkdir(output_path)
-        except OSError as e:
-            raise OSError(f"Failed to create output "
-                          f"directory at {output_path}: {e}")
-    return output_path
 
 
 def process_file(parsed_file:str, output_dir:str):
