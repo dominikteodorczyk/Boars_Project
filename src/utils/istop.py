@@ -1054,7 +1054,7 @@ class LabelsCalc:
         buffer.seek(0)
         return buffer
 
-    def _choose_param_value(self, data: pd.DataFrame, param: str) -> int:
+    def _choose_param_value(self, data: pd.DataFrame, param: str) -> float:
         """
         Choose the optimal value for a given parameter based on
         the sensitivity matrix.
@@ -1072,7 +1072,7 @@ class LabelsCalc:
 
         Returns
         -------
-        int
+        float
             The selected optimal parameter value based on
             the stabilization point.
         """
@@ -1100,7 +1100,7 @@ class LabelsCalc:
         stabilization_x = x[dxdy.index[:5]]
         filtred = data[data[param].isin(stabilization_x)]
         suma_total_stops = filtred.groupby(param)["Total_stops"].sum()
-        stabilization_point_index = int(suma_total_stops.idxmax())
+        stabilization_point_index = float(suma_total_stops.idxmax())
 
         plot_obj = self._plot_param(
             param, stabilization_point_index, x, y, dy_dx  # type: ignore
