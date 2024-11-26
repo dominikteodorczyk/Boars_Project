@@ -555,7 +555,7 @@ class DataFilter:
                 selected = cur_df[
                     (cur_df["datetime"] <= max_date) &
                     (cur_df["datetime"] >= min_date)
-                ]
+                ].copy()
                 selected["user_id"] = an_id
                 selected = selected.set_index(["user_id", "datetime"])
                 extracted.append(selected)
