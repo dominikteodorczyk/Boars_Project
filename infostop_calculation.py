@@ -30,12 +30,18 @@ python process_data.py
 
 import os
 import traceback
-from src.utils.dataIO import DataPrepocessing
+import logging
+from numpy import info
+from src.utils.dataIO import DataPrepocessing, DataIO
 from src.utils.istop import InfoStopData
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 # Define the directory containing parsed data files
 PARSED_DATA_DIR = ''
-OUTPUT_DIR_NAME = ''
+OUTPUT_DIR_NAME = 'infostop_output'
 
 
 def get_file_paths(directory:str) -> list:
@@ -94,8 +100,8 @@ def process_file(parsed_file:str, output_dir:str):
     """
     try:
         # Prepare data for processing
-        data = DataPrepocessing(parsed_file)
-        clean_data, data_name = data.infostop_data_prepare()
+        clean_data = DataIO.open_for_infostop(parsed_file)
+        data_name = DataIO.get_animal_name(parsed_file)
 
         # Create and process an InfoStopData object
         infostop_object = InfoStopData(
@@ -106,7 +112,7 @@ def process_file(parsed_file:str, output_dir:str):
         infostop_object.calculate_all()
 
     except Exception as e:
-        print(f"Error processing file {parsed_file}: {e}")
+        logging.error(f"Error processing file {parsed_file}: {e}")
         traceback.print_exc()
 
 
@@ -132,11 +138,13 @@ def main():
 
         # Process each parsed file
         for parsed_file in file_paths:
-            print(f"Processing file: {parsed_file}")
+            logging.info(f"Processing file: {parsed_file}")
             process_file(parsed_file, output_dir)
 
     except Exception as e:
-        print(f"An unexpected error occurred in the main workflow: {e}")
+        logging.error(
+            f"An unexpected error occurred in the main workflow: {e}"
+        )
         traceback.print_exc()
 
 
