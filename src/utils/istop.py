@@ -45,6 +45,11 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message="Pandas doesn't allow columns to be created via a new attribute name"
+    )
 
 class DataAnalystInfostop:
     """
@@ -1280,21 +1285,26 @@ class InfoStopData:
 
             # Step 3: Filter the data
             filtred_data = filter.filter_data(data=extracted_data)
-            raport.generate_raport(data=filtred_data, data_analyst_no=3)
 
-            # Step 4: Sort the data
-            sorted_data = filter.sort_data(filtred_data)
+            if len(filtred_data) !=0:
+                raport.generate_raport(data=filtred_data, data_analyst_no=3)
 
-            # Step 5: Process data with the infostop module
-            trajectory_processed_data = labels_calculator.calculate_infostop(
-                sorted_data
-            )
+                # Step 4: Sort the data
+                sorted_data = filter.sort_data(filtred_data)
 
-            # Save results to CSV
-            csv_path = os.path.join(
-                self.output_dir, f"Trajectory_processed_{self.animal_name}.csv"
-            )
-            trajectory_processed_data.to_csv(csv_path)
+                # Step 5: Process data with the infostop module
+                trajectory_processed_data = labels_calculator.calculate_infostop(
+                    sorted_data
+                )
+
+                # Save results to CSV
+                csv_path = os.path.join(
+                    self.output_dir,
+                    f"Trajectory_processed_{self.animal_name}.csv"
+                )
+                trajectory_processed_data.to_csv(csv_path)
+            else:
+                logging.warning('No animals after filtration')
 
             # Save report to PDF
             pdf_path = os.path.join(
