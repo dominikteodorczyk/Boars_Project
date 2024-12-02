@@ -21,6 +21,206 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
+
+class Curves:
+    """
+    A class containing various static methods to model different
+    mathematical curves. These methods take input values and parameters
+    to compute specific mathematical transformations.
+    """
+
+    @staticmethod
+    def linear(x, a, b):
+        """
+        Computes a linear transformation: y = a * x * b.
+
+        Parameters:
+        x (array-like): Input values.
+        a (float): Slope coefficient.
+        b (float): Scaling coefficient.
+
+        Returns:
+        array-like: Transformed values.
+        """
+        x = x.astype(float)
+        return a * x * b
+
+    @staticmethod
+    def expon(x, a, b):
+        """
+        Computes an exponential curve: y = a * x^b.
+
+        Parameters:
+        x (array-like): Input values.
+        a (float): Base scaling coefficient.
+        b (float): Exponent.
+
+        Returns:
+        array-like: Transformed values.
+        """
+        x = x.astype(float)
+        return a * np.power(x, b)
+
+    @staticmethod
+    def expon_neg(x, a, b):
+        """
+        Computes a negative exponential curve: y = a * x^(-b).
+
+        Parameters:
+        x (array-like): Input values.
+        a (float): Scaling coefficient.
+        b (float): Negative exponent.
+
+        Returns:
+        array-like: Transformed values.
+        """
+        x = x.astype(float)
+        return a * pow(x, -b)
+
+    @staticmethod
+    def euler(x, a, b):
+        """
+        Computes an Euler's exponential curve: y = a * e^(b * x).
+
+        Parameters:
+        x (array-like): Input values.
+        a (float): Scaling coefficient.
+        b (float): Exponent coefficient.
+
+        Returns:
+        array-like: Transformed values.
+        """
+        x = x.astype(float)
+        return a * np.exp(b * x)
+
+    @staticmethod
+    def power(x, a, b):
+        """
+        Computes a power curve: y = a * b^x.
+
+        Parameters:
+        x (array-like): Input values.
+        a (float): Scaling coefficient.
+        b (float): Base.
+
+        Returns:
+        array-like: Transformed values.
+        """
+        x = x.astype(float)
+        return a * pow(b, x)
+
+    @staticmethod
+    def power_neg(x, a, b):
+        """
+        Computes a negative power curve: y = a * b^(-x).
+
+        Parameters:
+        x (array-like): Input values.
+        a (float): Scaling coefficient.
+        b (float): Base.
+
+        Returns:
+        array-like: Transformed values.
+        """
+        x = x.astype(float)
+        return a * pow(b, -x)
+
+    @staticmethod
+    def logar(x, a, b):
+        """
+        Computes a logarithmic curve: y = a + b * log(x).
+
+        Parameters:
+        x (array-like): Input values.
+        a (float): Constant offset.
+        b (float): Logarithmic scaling factor.
+
+        Returns:
+        array-like: Transformed values.
+        """
+        x = x.astype(float)
+        return a + b * np.log(x)
+
+    @staticmethod
+    def cubic(x, a, b, c, d):
+        """
+        Computes a cubic curve: y = a*x^3 + b*x^2 + c*x + d.
+
+        Parameters:
+        x (array-like): Input values.
+        a, b, c, d (float): Coefficients for cubic, quadratic,
+            linear, and constant terms.
+
+        Returns:
+        array-like: Transformed values.
+        """
+        x = x.astype(float)
+        return a * x**3 + b * x**2 + c * x + d
+
+    @staticmethod
+    def sigmoid(x, a, b):
+        """
+        Computes a sigmoid curve: y = 1 / (1 + exp(a*x + b)).
+
+        Parameters:
+        x (array-like): Input values.
+        a (float): Scaling factor.
+        b (float): Offset factor.
+
+        Returns:
+        array-like: Transformed values.
+        """
+        x = x.astype(float)
+        return 1 / (1 + np.exp(a * x + b))
+
+    @staticmethod
+    def quad(x, a, b, c):
+        """
+        Computes a quadratic curve: y = a*x^2 + b*x + c.
+
+        Parameters:
+        x (array-like): Input values.
+        a (float): Coefficient for the quadratic term.
+        b (float): Coefficient for the linear term.
+        c (float): Constant term.
+
+        Returns:
+        array-like: Transformed values.
+        """
+        x = x.astype(float)
+        return a * x**2 + b * x + c
+
+    @staticmethod
+    def four(x, a, b, c, d, e):
+        """
+        Computes a quartic curve: y = a*x^4 + b*x^3 + c*x^2 + d*x + e.
+
+        Parameters:
+        x (array-like): Input values.
+        a, b, c, d, e (float): Coefficients for quartic, cubic, quadratic, linear, and constant terms.
+
+        Returns:
+        array-like: Transformed values.
+        """
+        x = x.astype(float)
+        return a * x**4 + b * x**3 + c * x**2 + d * x + e
+
+    @staticmethod
+    def zipf(x, a, b):
+        """
+        Computes a Zipf curve: y = 1 / (x + a)^b.
+
+        Parameters:
+        x (array-like): Input values.
+        a (float): Offset to prevent division by zero.
+        b (float): Exponent for scaling.
+
+        Returns:
+        array-like: Transformed values.
+        """
+        return 1 / (x + a) ** b
+
+
 class Stats:
     """
     A utility class for calculating various statistics and metrics
@@ -28,7 +228,7 @@ class Stats:
     """
 
     @staticmethod
-    def get_animals_no(data:TrajectoriesFrame) -> int:
+    def get_animals_no(data: TrajectoriesFrame) -> int:
         """
         Get the total number of unique animals in the dataset.
 
@@ -42,7 +242,7 @@ class Stats:
         return len(data.get_users())
 
     @staticmethod
-    def get_period(data:TrajectoriesFrame) -> pd.Timedelta:
+    def get_period(data: TrajectoriesFrame) -> pd.Timedelta:
         """
         Get the total observation period of the dataset.
 
@@ -69,7 +269,7 @@ class Stats:
 
     @staticmethod
     def get_min_labels_no_after_filtration(
-        data:TrajectoriesFrame
+        data: TrajectoriesFrame
     ) -> pd.Series:
         """
         Get the users with the minimum number of unique labels
@@ -82,7 +282,7 @@ class Stats:
         Returns:
             pd.Series: Users with the minimum unique label count.
         """
-        unique_label_counts = data.groupby('user_id')['labels'].nunique()
+        unique_label_counts = data.groupby("user_id")["labels"].nunique()
         min_unique_label_count = unique_label_counts.min()
         return unique_label_counts[
             unique_label_counts == min_unique_label_count
@@ -90,7 +290,7 @@ class Stats:
 
     @staticmethod
     def get_min_records_no_before_filtration(
-        data:TrajectoriesFrame
+        data: TrajectoriesFrame
     ) -> pd.Series:
         """
         Get the animals with the minimum number of records
@@ -103,12 +303,12 @@ class Stats:
         Returns:
             pd.Series: Animals with the minimum number of records.
         """
-        records_counts = data.reset_index().groupby('user_id').datetime.count()
+        records_counts = data.reset_index().groupby("user_id").datetime.count()
         min_label_count = records_counts.min()
         return records_counts[records_counts == min_label_count]
 
     @staticmethod
-    def get_mean_periods(data:TrajectoriesFrame) -> pd.Timedelta:
+    def get_mean_periods(data: TrajectoriesFrame) -> pd.Timedelta:
         """
         Get the mean period between start and end times.
 
@@ -119,10 +319,10 @@ class Stats:
         Returns:
             float: The mean period in days.
         """
-        return (data['end'] - data['start']).mean() # type: ignore
+        return (data["end"] - data["start"]).mean()  # type: ignore
 
     @staticmethod
-    def get_min_periods(data:TrajectoriesFrame) -> pd.Timedelta:
+    def get_min_periods(data: TrajectoriesFrame) -> pd.Timedelta:
         """
         Get the minimum period between start and end times.
 
@@ -133,10 +333,10 @@ class Stats:
         Returns:
             float: The minimum period in days.
         """
-        return (data['end'] - data['start']).min() # type: ignore
+        return (data["end"] - data["start"]).min()  # type: ignore
 
     @staticmethod
-    def get_max_periods(data:TrajectoriesFrame) -> pd.Timedelta:
+    def get_max_periods(data: TrajectoriesFrame) -> pd.Timedelta:
         """
         Get the maximum period between start and end times.
 
@@ -147,10 +347,10 @@ class Stats:
         Returns:
             float: The maximum period in days.
         """
-        return (data['end'] - data['start']).max() # type: ignore
+        return (data["end"] - data["start"]).max()  # type: ignore
 
     @staticmethod
-    def get_overall_area(data:TrajectoriesFrame) -> float:
+    def get_overall_area(data: TrajectoriesFrame) -> float:
         """
         Get the overall area covered by the trajectories.
 
@@ -162,10 +362,10 @@ class Stats:
 
         """
         convex_hull = data.unary_union.convex_hull
-        return round(convex_hull.area / 10000,0)
+        return round(convex_hull.area / 10000, 0)
 
     @staticmethod
-    def get_mean_area(data:TrajectoriesFrame) -> float:
+    def get_mean_area(data: TrajectoriesFrame) -> float:
         """
         Get the mean area covered by trajectories per user.
 
@@ -175,15 +375,15 @@ class Stats:
         Returns:
             float: The mean area in hectares.
         """
-        grouped = data.copy().groupby('user_id')
+        grouped = data.copy().groupby("user_id")
         areas = []
         for user_id, group in grouped:
             convex_hull = group.unary_union.convex_hull
             areas.append(convex_hull.area / 10000)
-        return round(sum(areas) / len(areas),0)
+        return round(sum(areas) / len(areas), 0)
 
     @staticmethod
-    def get_min_area(data:TrajectoriesFrame) -> float:
+    def get_min_area(data: TrajectoriesFrame) -> float:
         """
         Get the min area covered by trajectories per user.
 
@@ -193,15 +393,15 @@ class Stats:
         Returns:
             float: The min area in hectares.
         """
-        grouped = data.copy().groupby('user_id')
+        grouped = data.copy().groupby("user_id")
         areas = []
         for user_id, group in grouped:
             convex_hull = group.unary_union.convex_hull
             areas.append(convex_hull.area / 10000)
-        return round(min(areas),0)
+        return round(min(areas), 0)
 
     @staticmethod
-    def get_max_area(data:TrajectoriesFrame) -> float:
+    def get_max_area(data: TrajectoriesFrame) -> float:
         """
         Get the max area covered by trajectories per user.
 
@@ -211,12 +411,12 @@ class Stats:
         Returns:
             float: The max area in hectares.
         """
-        grouped = data.copy().groupby('user_id')
+        grouped = data.copy().groupby("user_id")
         areas = []
         for user_id, group in grouped:
             convex_hull = group.unary_union.convex_hull
             areas.append(convex_hull.area / 10000)
-        return round(max(areas),0)
+        return round(max(areas), 0)
 
 
 class DataSetStats:
@@ -224,21 +424,22 @@ class DataSetStats:
     def __init__(self, output_dir) -> None:
         self.output_dir = output_dir
         self.record = {}
-        self.stats_frame = pd.DataFrame(columns=[
-                'animal',
-                'animal_no',
-                'animal_after_filtration',
-                'time_period',
-                'min_label_no',
-                'min_records',
-                'avg_duration',
-                'min_duration',
-                'max_duration',
-                'overall_set_area',
-                'average_set_area',
-                'min_area',
-                'max_area',
-                'visitation_frequency',
+        self.stats_frame = pd.DataFrame(
+            columns=[
+                "animal",
+                "animal_no",
+                "animal_after_filtration",
+                "time_period",
+                "min_label_no",
+                "min_records",
+                "avg_duration",
+                "min_duration",
+                "max_duration",
+                "overall_set_area",
+                "average_set_area",
+                "min_area",
+                "max_area",
+                "visitation_frequency",
                 "visitation_frequency_params",
                 "distinct_locations_over_time",
                 "distinct_locations_over_time_params",
@@ -263,11 +464,11 @@ class DataSetStats:
             ]
         )
 
-    def add_data(self, data:dict) -> None:
+    def add_data(self, data: dict) -> None:
         self.record.update(data)
 
     def add_record(self) -> None:
-        self.stats_frame._append(self.record,ignore_index = True) # type: ignore
+        self.stats_frame._append(self.record, ignore_index=True)  # type: ignore
         self.record = {}
 
 
@@ -277,7 +478,7 @@ class Prepocessing:
         pass
 
     @staticmethod
-    def get_mean_points(data:TrajectoriesFrame) -> TrajectoriesFrame:
+    def get_mean_points(data: TrajectoriesFrame) -> TrajectoriesFrame:
         basic_df = data.reset_index()
         geometry_df = pd.DataFrame()
         for an_id, values in tqdm(
@@ -295,12 +496,14 @@ class Prepocessing:
                 geometry_df = geometry_df._append(
                     label_df[["user_id", "labels", "datetime", "lat", "lon"]],
                     ignore_index=True,
-                ) # type: ignore
+                )  # type: ignore
 
-        return TrajectoriesFrame(geometry_df.sort_values("datetime").drop_duplicates())
+        return TrajectoriesFrame(
+            geometry_df.sort_values("datetime").drop_duplicates()
+        )
 
     @staticmethod
-    def set_start_stop_time(data:TrajectoriesFrame) -> TrajectoriesFrame:
+    def set_start_stop_time(data: TrajectoriesFrame) -> TrajectoriesFrame:
         compressed = pd.DataFrame(
             start_end(data).reset_index()[
                 [
@@ -311,8 +514,7 @@ class Prepocessing:
                     "lon",
                     "date",
                     "start",
-                    "end"
-                ]
+                    "end"]
             ]
         )
         return TrajectoriesFrame(
@@ -325,9 +527,9 @@ class Prepocessing:
 
     @staticmethod
     def set_crs(
-        data:TrajectoriesFrame,
-        base_csr:int = const.ELLIPSOIDAL_CRS,
-        target_crs:int=const.CARTESIAN_CRS
+        data: TrajectoriesFrame,
+        base_csr: int = const.ELLIPSOIDAL_CRS,
+        target_crs: int = const.CARTESIAN_CRS,
     ) -> TrajectoriesFrame:
 
         data.set_crs(base_csr)
@@ -337,7 +539,7 @@ class Prepocessing:
 
     @staticmethod
     def filter_by_min_number(
-        data:TrajectoriesFrame, min_labels_no:int = const.MIN_LABEL_NO
+        data: TrajectoriesFrame, min_labels_no: int = const.MIN_LABEL_NO
     ) -> TrajectoriesFrame:
 
         data_without_nans = data[data.isna().any(axis=1)]
@@ -345,12 +547,9 @@ class Prepocessing:
 
         return TrajectoriesFrame(
             data_without_nans.loc[
-                distinct_locations[
-                    distinct_locations > min_labels_no
-                ].index
+                distinct_locations[distinct_locations > min_labels_no].index
             ]
         )
-
 
     @staticmethod
     def filter_by_quartiles(
@@ -359,8 +558,9 @@ class Prepocessing:
 
         allowed_quartiles = {0.25, 0.5, 0.75}
         if quartile not in allowed_quartiles:
-            raise ValueError(f"Invalid quartile value: {quartile}. "
-                             f"Allowed values are {allowed_quartiles}."
+            raise ValueError(
+                f"Invalid quartile value: {quartile}. "
+                f"Allowed values are {allowed_quartiles}."
             )
         else:
             data_without_nans = data[~data.isna().any(axis=1)]
@@ -374,29 +574,29 @@ class Prepocessing:
                 data_without_nans.loc[
                     distinct_locations[
                         distinct_locations > quartile_value
-                    ].index]
+                    ].index
+                ]
             )
-
 
 
 class Laws:
 
-    def __init__(self, pdf_object: FPDF, stats_dict:dict, output_path: str) -> None:
+    def __init__(
+            self, pdf_object: FPDF, stats_dict: dict, output_path: str
+    ) -> None:
         self.pdf_object = pdf_object
         self.output_path = output_path
-
-
 
 
 class ScalingLawsCalc:
 
     def __init__(
-            self,
-            data:TrajectoriesFrame,
-            data_name:str,
-            output_dir:str,
-            stats_frame:DataSetStats
-        ) -> None:
+        self,
+        data: TrajectoriesFrame,
+        data_name: str,
+        output_dir: str,
+        stats_frame: DataSetStats,
+    ) -> None:
         self.data = data
         self.animal_name = data_name
         self.output_dir = output_dir
@@ -426,24 +626,24 @@ class ScalingLawsCalc:
         converted_to_cartesian = preproc.set_crs(compressed_points)
         filtered_animals = preproc.filter_by_quartiles(converted_to_cartesian)
 
-        print('RAW ANIMAL NO:',stats.get_animals_no(self.data))
-        print('FILTRED ANIMAL NO:',stats.get_animals_no(filtered_animals))
+        print("RAW ANIMAL NO:", stats.get_animals_no(self.data))
+        print("FILTRED ANIMAL NO:", stats.get_animals_no(filtered_animals))
 
-        print('RAW ANIMAL PERIOD:',stats.get_period(filtered_animals))
-        print('FILTRED ANIMAL PERIOD:',stats.get_period(filtered_animals))
+        print("RAW ANIMAL PERIOD:", stats.get_period(filtered_animals))
+        print("FILTRED ANIMAL PERIOD:", stats.get_period(filtered_animals))
 
-        print('MIN RECORDS NO BEF FILTRATION :',stats.get_min_records_no_before_filtration(self.data))
-        print('MIN LABELS NO AFTER FILTRATION :',stats.get_min_labels_no_after_filtration(filtered_animals))
+        print(
+            "MIN RECORDS NO BEF FILTRATION :",
+            stats.get_min_records_no_before_filtration(self.data),
+        )
+        print(
+            "MIN LABELS NO AFTER FILTRATION :",
+            stats.get_min_labels_no_after_filtration(filtered_animals),
+        )
 
-        #FIXME: choose data for compressed csv and next step of calculations
+        # FIXME: choose data for compressed csv and next step of calculations
         return compressed_points, filtered_animals
-
 
     def process_file(self) -> None:
 
         compressed_points, filtered_animals = self._preprocess_data()
-
-
-
-
-
