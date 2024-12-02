@@ -677,7 +677,7 @@ class DataFilter:
             level2 = set(traj_dur_filter[traj_dur_filter > 20].index)
 
             level3 = set(
-                temp_res_animal_ex[temp_res_animal_ex <= "30min"].index
+                temp_res_animal_ex[temp_res_animal_ex <= "1H"].index
             )
 
             # User filtration with ULOC method
