@@ -9,6 +9,11 @@ from src.measures.stats import AnimalStatistics
 from fpdf import FPDF
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
+from humobi.measures.individual import *
+from humobi.tools.processing import *
+from humobi.tools.user_statistics import *
+from constans import const
 
 sns.set_style("whitegrid")
 
@@ -98,7 +103,7 @@ class Stats:
         Returns:
             pd.Series: Animals with the minimum number of records.
         """
-        records_counts = data.groupby('animal_id').time.count()
+        records_counts = data.reset_index().groupby('user_id').datetime.count()
         min_label_count = records_counts.min()
         return records_counts[records_counts == min_label_count]
 
@@ -271,6 +276,108 @@ class Prepocessing:
     def __init__(self) -> None:
         pass
 
+    @staticmethod
+    def get_mean_points(data:TrajectoriesFrame) -> TrajectoriesFrame:
+        basic_df = data.reset_index()
+        geometry_df = pd.DataFrame()
+        for an_id, values in tqdm(
+            data.groupby(level=0), total=len(data.groupby(level=0))
+        ):
+            filtered_df = basic_df[basic_df["user_id"] == an_id]
+            lables_pack = sorted(filtered_df["labels"].unique())
+
+            for lbl in lables_pack:
+                label_df = filtered_df[filtered_df["labels"] == lbl]
+                label_df["lat"] = label_df["lat"].mean()
+                label_df["lon"] = label_df["lon"].mean()
+                label_df = label_df.reset_index()
+
+                geometry_df = geometry_df._append(
+                    label_df[["user_id", "labels", "datetime", "lat", "lon"]],
+                    ignore_index=True,
+                ) # type: ignore
+
+        return TrajectoriesFrame(geometry_df.sort_values("datetime").drop_duplicates())
+
+    @staticmethod
+    def set_start_stop_time(data:TrajectoriesFrame) -> TrajectoriesFrame:
+        compressed = pd.DataFrame(
+            start_end(data).reset_index()[
+                [
+                    "user_id",
+                    "datetime",
+                    "labels",
+                    "lat",
+                    "lon",
+                    "date",
+                    "start",
+                    "end"
+                ]
+            ]
+        )
+        return TrajectoriesFrame(
+            compressed,
+            {
+                "names": ["num", "labels", "lat", "lon", "time", "animal_id"],
+                "crs": const.ELLIPSOIDAL_CRS,
+            },
+        )
+
+    @staticmethod
+    def set_crs(
+        data:TrajectoriesFrame,
+        base_csr:int = const.ELLIPSOIDAL_CRS,
+        target_crs:int=const.CARTESIAN_CRS
+    ) -> TrajectoriesFrame:
+
+        data.set_crs(base_csr)
+        data.to_crs(target_crs)
+
+        return data
+
+    @staticmethod
+    def filter_by_min_number(
+        data:TrajectoriesFrame, min_labels_no:int = const.MIN_LABEL_NO
+    ) -> TrajectoriesFrame:
+
+        data_without_nans = data[data.isna().any(axis=1)]
+        distinct_locations = num_of_distinct_locations(data_without_nans)
+
+        return TrajectoriesFrame(
+            data_without_nans.loc[
+                distinct_locations[
+                    distinct_locations > min_labels_no
+                ].index
+            ]
+        )
+
+
+    @staticmethod
+    def filter_by_quartiles(
+        data: TrajectoriesFrame, quartile: float = const.QUARTILE
+    ) -> TrajectoriesFrame:
+
+        allowed_quartiles = {0.25, 0.5, 0.75}
+        if quartile not in allowed_quartiles:
+            raise ValueError(f"Invalid quartile value: {quartile}. "
+                             f"Allowed values are {allowed_quartiles}."
+            )
+        else:
+            data_without_nans = data[~data.isna().any(axis=1)]
+            distinct_locations = num_of_distinct_locations(data_without_nans)
+            quartile_value = np.quantile(distinct_locations, quartile)
+
+            if quartile_value < const.MIN_QUARTILE_VALUE:
+                quartile_value = const.MIN_QUARTILE_VALUE
+
+            return TrajectoriesFrame(
+                data_without_nans.loc[
+                    distinct_locations[
+                        distinct_locations > quartile_value
+                    ].index]
+            )
+
+
 
 class Laws:
 
@@ -309,8 +416,34 @@ class ScalingLawsCalc:
         self.pdf.set_font("Arial", size=9)
         self.pdf.cell(200, 10, text=f"{self.animal_name}", ln=True, align="C")
 
+    def _preprocess_data(self) -> tuple:
+        preproc = Prepocessing()
+        stats = Stats()
+
+        mean_points_values = preproc.get_mean_points(self.data)
+        compressed_points = preproc.set_start_stop_time(mean_points_values)
+
+        converted_to_cartesian = preproc.set_crs(compressed_points)
+        filtered_animals = preproc.filter_by_quartiles(converted_to_cartesian)
+
+        print('RAW ANIMAL NO:',stats.get_animals_no(self.data))
+        print('FILTRED ANIMAL NO:',stats.get_animals_no(filtered_animals))
+
+        print('RAW ANIMAL PERIOD:',stats.get_period(filtered_animals))
+        print('FILTRED ANIMAL PERIOD:',stats.get_period(filtered_animals))
+
+        print('MIN RECORDS NO BEF FILTRATION :',stats.get_min_records_no_before_filtration(self.data))
+        print('MIN LABELS NO AFTER FILTRATION :',stats.get_min_labels_no_after_filtration(filtered_animals))
+
+        #FIXME: choose data for compressed csv and next step of calculations
+        return compressed_points, filtered_animals
+
+
     def process_file(self) -> None:
-        pass
+
+        compressed_points, filtered_animals = self._preprocess_data()
+
+
 
 
 
