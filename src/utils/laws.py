@@ -17,6 +17,9 @@ from humobi.tools.processing import *
 from humobi.tools.user_statistics import *
 from constans import const
 import scipy.stats as scp_stats
+from distfit import distfit
+from functools import wraps
+from io import BytesIO
 
 sns.set_style("whitegrid")
 
@@ -738,9 +741,220 @@ class Prepocessing:
 
 class Laws:
 
-    def __init__(self, pdf_object: FPDF, stats_dict: dict, output_path: str) -> None:
+    def __init__(self, pdf_object: FPDF, stats_frame: DataSetStats, output_path: str):
         self.pdf_object = pdf_object
         self.output_path = output_path
+        self.stats_frame = stats_frame
+        self.curve_fitting = DistributionFitingTools()
+
+
+    def visitation_frequency(self, data:TrajectoriesFrame, min_labels_no:int):
+        vf = visitation_frequency(data)
+        avg_vf = rowwise_average(vf, row_count=min_labels_no)
+        avg_vf.index += 1
+        vf.groupby(level=0).size().median()
+        avg_vf = avg_vf[~avg_vf.isna()]
+
+        y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
+            self.curve_fitting.model_choose(avg_vf)
+        )
+
+        return best_fit, global_params, y_pred, expon_y_pred, avg_vf, ['f','Rank']
+
+
+    def distinct_locations_over_time(self, data:TrajectoriesFrame, min_labels_no:int):
+
+        dlot = distinct_locations_over_time(data)
+        avg_dlot = rowwise_average(dlot, row_count=min_labels_no)
+        avg_dlot.index += 1
+        dlot.groupby(level=0).size().median()
+        avg_dlot = avg_dlot[~avg_dlot.isna()]
+
+        y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
+            DistributionFitingTools().model_choose(avg_dlot)
+        )
+
+        return best_fit, global_params, y_pred, expon_y_pred, ['S(t)','t']
+
+    def jump_lengths_distribution(self, data:TrajectoriesFrame):
+        jl = jump_lengths(data)
+        jl = jl[jl != 0]
+        jl_dist = convert_to_distribution(jl, num_of_classes=20)
+
+        # Fit to find the best theoretical distribution
+        jl = jl[~jl.isna()]
+        model = distfit(stats="wasserstein")
+        model.fit_transform(jl.values)
+
+
+    def waiting_times(self, data:TrajectoriesFrame):
+        data_set = data.copy()
+        try:
+            wt = data_set.groupby(level=0).apply(
+                lambda x: (x.end - x.start).dt.total_seconds().round()
+            )
+        except:
+            wt = (data_set['end'] - data_set['start']).dt.total_seconds().round()
+
+        wt = wt[~wt.isna()] # type: ignore
+        wt = wt[wt != 0]
+
+        # Fit to find the best theoretical distribution
+        model = distfit(stats="wasserstein")
+        model.fit_transform(wt.values)
+        logging.info(f'Best fit: {model.model["name"]},{ model.model["params"]}')
+
+
+    def travel_times(self, data:TrajectoriesFrame):
+        data_set = data.copy()
+        try:
+            tt = (
+                data_set.groupby(level=0)
+                .progress_apply(lambda x: x.shift(-1).start - x.end) # type: ignore
+                .reset_index(level=[1, 2], drop=True)
+            )
+        except:
+            shifted_start = data_set['start'].shift(-1)
+            tt = shifted_start - data_set['end']
+            tt = tt.reset_index(drop=True)
+
+        tt = tt.dt.total_seconds()
+        tt = tt[~tt.isna()]
+
+        # Fit to find the best theoretical distribution
+        model = distfit(stats="wasserstein")
+        model.fit_transform(tt.values)
+
+    def rog(self, data:TrajectoriesFrame):
+        rog = radius_of_gyration(data, time_evolution=False)
+
+        # Fit to find the best theoretical distribution
+        model = distfit(stats="RSS")
+        model.fit_transform(rog.values)
+
+    def rog_over_time(self, data:TrajectoriesFrame):
+        rog = radius_of_gyration(data, time_evolution=True)
+        avg_rog = rowwise_average(rog)
+        avg_rog = avg_rog[~avg_rog.isna()]
+
+        # model selection
+        y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
+            DistributionFitingTools().model_choose(avg_rog)
+        )
+
+        return best_fit, global_params, y_pred, expon_y_pred, ['Time','Values']
+
+
+    def msd_distribution(self, data:TrajectoriesFrame):
+        msd = mean_square_displacement(
+            data, time_evolution=False, from_center=True
+        )
+
+        # Fit to find the best theoretical distribution
+        model = distfit(stats="wasserstein")
+        model.fit_transform(msd.values)
+
+    def msd_curve(self, data:TrajectoriesFrame, min_records_no:int):
+        msd = mean_square_displacement(
+            data,
+            time_evolution=True,
+            from_center=False
+        )
+        avg_msd = rowwise_average(msd, row_count=min_records_no)
+        avg_msd = avg_msd[~avg_msd.isna()]
+        # model selection
+        y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
+            DistributionFitingTools().model_choose(avg_msd)
+        )
+
+        return best_fit, global_params, y_pred, expon_y_pred, ['MSD','t']
+
+    def return_time_distribution(self, data:TrajectoriesFrame):
+        to_concat = {}
+        data_set = data.copy()
+        for uid, vals in tqdm(
+            data_set.groupby(level=0),
+            total=len(pd.unique(data_set.index.get_level_values(0))),
+        ):
+            vals = vals.sort_index()[
+                [
+                "labels",
+                "start",
+                "end"]
+                ]
+
+            vals["new_place"] = ~vals["labels"].duplicated(keep="first")
+            vals["islands"] = vals["new_place"] * (
+                (vals["new_place"] != vals["new_place"].shift(1)).cumsum()
+            )
+            vals["islands_reach"] = vals["islands"].shift()
+            vals["islands"] = vals[["islands", "islands_reach"]].max(axis=1)
+
+            vals = vals.drop("islands_reach", axis=1)
+            vals = vals[vals.islands > 0]
+
+            result = vals.groupby("islands").apply(
+                lambda x: x.iloc[-1].start - x.iloc[0].start if len(x) > 0 else None # type: ignore
+            ) # type: ignore
+            result = result.dt.total_seconds()
+            to_concat[uid] = result
+
+        rt = pd.concat(to_concat)
+        rt = rt.reset_index(level=1, drop=True)
+        rt = rt[rt != 0]
+        rt = pd.concat(to_concat)
+        rt = rt[rt != 0]
+
+        # Fit to find the best theoretical distribution
+        model = distfit(stats="wasserstein")
+        model.fit_transform(rt.values)
+
+
+    def exploration_time(self, data:TrajectoriesFrame):
+        to_concat = {}
+        data_set = data.copy()
+        for uid, vals in tqdm(
+            data_set.groupby(level=0),
+            total=len(
+                pd.unique(
+                    data_set.index.get_level_values(0)
+                    )
+                ),
+        ):
+            vals = vals.sort_index()[
+                [
+                    "labels",
+                    "start",
+                    "end"
+                    ]
+                ]
+
+            vals["old_place"] = vals["labels"].duplicated(keep="first")
+            vals["islands"] = vals["old_place"] * (
+                (vals["old_place"] != vals["old_place"].shift(1)).cumsum()
+            )
+            vals["islands_reach"] = vals["islands"].shift()
+            vals["islands"] = vals[["islands", "islands_reach"]].max(axis=1)
+
+            vals = vals.drop("islands_reach", axis=1)
+            vals = vals[vals.islands > 0]
+
+            result = vals.groupby("islands").apply(
+                lambda x: x.iloc[-1].start - x.iloc[0].start if len(x) > 0 else None # type: ignore
+            ) # type: ignore
+            if result.size == 0:
+                continue
+            result = result.dt.total_seconds()
+            to_concat[uid] = result
+
+        et = pd.concat(to_concat)
+        et = et.reset_index(level=1, drop=True)
+        et = et[et != 0]
+
+        # Fit to find the best theoretical distribution
+        model = distfit(stats="wasserstein")
+        model.fit_transform(et.values)
+
 
 
 class ScalingLawsCalc:
@@ -768,6 +982,7 @@ class ScalingLawsCalc:
             )
 
         self.pdf.add_page()
+        self.pdf.set_auto_page_break(auto=True, margin=15)
         self.pdf.set_font("Arial", size=9)
         self.pdf.cell(200, 10, text=f"{self.animal_name}", ln=True, align="C")
 
@@ -802,3 +1017,7 @@ class ScalingLawsCalc:
     def process_file(self) -> None:
 
         compressed_points, filtered_animals = self._preprocess_data()
+
+        laws = Laws(pdf_object=self.pdf, stats_dict=self.stats_frame, output_path=self.output_dir_animal)
+
+        l = laws.visitation_frequency(filtered_animals, 14)
