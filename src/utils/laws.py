@@ -821,6 +821,21 @@ class Laws:
         buffer.seek(0)
         return buffer
 
+
+    def log_curve_fitting_resluts(func):
+        def wrapper(self, *args, **kwargs):
+            func_name, best_fit, param_frame, plot_obj = func(self, *args, **kwargs)
+            filtered_df = param_frame[param_frame['name'] == best_fit]
+            self.stats_frame.add_data({best_fit: filtered_df[['param1', 'param2']].values.tolist()})
+
+            self._add_pdf_cell(f'{func_name}')
+            self._add_pdf_cell(f'{best_fit} with params: {filtered_df[["param1", "param2"]]}')
+            self._add_pdf_cell()
+            self._add_pdf_plot(plot_obj, 200, 100)
+
+        return wrapper
+
+
     def check_curve_fit(func):
         def wrapper(self, *args, **kwargs):
             best_fit, param_frame, y_pred, exp_y_pred, plot_data, labels = func(
