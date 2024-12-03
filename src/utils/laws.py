@@ -747,6 +747,79 @@ class Laws:
         self.stats_frame = stats_frame
         self.curve_fitting = DistributionFitingTools()
 
+    def _add_pdf_cell(self, txt_to_add: str) -> None:
+        """
+        Add a single line of text to the PDF.
+
+        Parameters
+        ----------
+        txt_to_add : str
+            Text to be added to the PDF document.
+        """
+        self.pdf_object.cell(200, 5, text=txt_to_add, ln=True, align="L")
+
+    def _add_pdf_plot(
+        self,
+        plot_obj: BytesIO,
+        image_width: int,
+        image_height: int,
+        x_position: int = 10,
+    ) -> None:
+        """
+        Add a plot to the PDF.
+
+        Parameters
+        ----------
+        plot_obj : BytesIO
+            A BytesIO object containing the plot image.
+        image_width : int
+            Width of the plot in the PDF.
+        image_height : int
+            Height of the plot in the PDF.
+        x_position : int, optional
+            X-coordinate position of the plot, by default 10.
+        """
+        try:
+            y_position = self.pdf_object.get_y()
+            self.pdf_object.image(
+                plot_obj,
+                x=x_position,
+                y=y_position,
+                w=image_width,
+                h=image_height
+            )
+            self.pdf_object.set_y(y_position + image_height + 10)
+            plot_obj.close()
+        except Exception as e:
+            raise RuntimeError(f"Failed to add plot to PDF: {e}")
+
+    def _plot_curve(self, func_name, plot_data, y_pred, labels, exp_y_pred=None):
+        buffer = BytesIO()
+
+        # Display of data fitted curve
+        sns.set_style("whitegrid")
+        fig = plt.figure(figsize=(8, 5))
+        # ax = fig.add_subplot(1, 1, 1)
+
+        plt.plot(plot_data.index, y_pred, c="k", label='Sigmoid')
+        if exp_y_pred:
+            plt.plot(plot_data.index, y_pred, c="r", label ='Expon neg')
+
+        plt.scatter(plot_data.index, plot_data)
+        plt.loglog()
+        plt.xlabel(labels[0])
+        plt.ylabel(labels[1])
+        plt.legend(loc="lower left")
+        plt.savefig(
+            os.path.join(
+                self.output_path,
+                f"{func_name}.png",
+            )
+        )
+        plt.savefig(buffer, format="png")
+        plt.close()
+        buffer.seek(0)
+        return buffer
 
     def visitation_frequency(self, data:TrajectoriesFrame, min_labels_no:int):
         vf = visitation_frequency(data)
