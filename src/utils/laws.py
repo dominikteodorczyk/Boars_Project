@@ -235,7 +235,9 @@ class DistributionFitingTools:
     def __init__(self) -> None:
         self.curves = Curves()
 
-    def _fit_distribution(self, data, distribution) -> float:
+    def _fit_distribution(
+        self, data: np.ndarray, distribution: scipy.stats.rv_continuous
+    ) -> float:
         """
         Fits a given distribution to the data
 
@@ -263,7 +265,7 @@ class DistributionFitingTools:
         )  # AICc correction
         return aicc
 
-    def _calculate_akaike_weights(self, aic_values) -> np.ndarray:
+    def _calculate_akaike_weights(self, aic_values: list) -> np.ndarray:
         """
         Calculates Akaike weights from AIC values.
 
@@ -282,7 +284,7 @@ class DistributionFitingTools:
         weights = exp_term / np.sum(exp_term)
         return weights
 
-    def _multiple_distributions(self, data) -> tuple:
+    def _multiple_distributions(self, data: np.ndarray) -> tuple:
         """
         Fits multiple distributions to the data and selects
         the best one based on AICc.
@@ -318,7 +320,7 @@ class DistributionFitingTools:
 
         return best_distribution, weights
 
-    def model_choose(self, vals) -> tuple:
+    def model_choose(self, vals: pd.Series) -> tuple:
         """
         Chooses the best fitting model from a set of predefined curves
         based on AICc.
@@ -347,7 +349,7 @@ class DistributionFitingTools:
                 params, covar = curve_fit(c, vals.index.values, vals.values)
                 num_params = len(params)
 
-                y_pred = c(vals.index, *params)
+                y_pred = c(vals.index, *params)  # type: ignore
                 if c.__name__ == "expon":
                     expon_pred = y_pred
                 residuals = vals.values - y_pred
