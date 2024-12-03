@@ -821,6 +821,25 @@ class Laws:
         buffer.seek(0)
         return buffer
 
+    def check_curve_fit(func):
+        def wrapper(self, *args, **kwargs):
+            best_fit, param_frame, y_pred, exp_y_pred, plot_data, labels = func(
+                self, *args, **kwargs
+            ) # type: ignore
+            self._plot_curve()
+            if best_fit not in {'linear', 'expon', 'expon_neg'}:
+                plot_obj = self._plot_curve(
+                    func.__name__, plot_data, y_pred, labels, exp_y_pred
+                )
+                return best_fit, param_frame, plot_obj
+            else:
+                plot_obj = self._plot_curve(
+                    func.__name__, plot_data, y_pred, labels
+                )
+                return func.__name__, best_fit, param_frame, plot_obj
+        return wrapper
+
+    @check_curve_fit
     def visitation_frequency(self, data:TrajectoriesFrame, min_labels_no:int):
         vf = visitation_frequency(data)
         avg_vf = rowwise_average(vf, row_count=min_labels_no)
