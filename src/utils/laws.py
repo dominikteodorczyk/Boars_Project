@@ -1,9 +1,11 @@
 from datetime import timedelta
-from numpy import size
+from numpy import ndarray, size
 import pandas as pd
 import os
 import logging
 from humobi.structures.trajectory import TrajectoriesFrame
+import scipy
+import scipy.stats
 from src.measures.measures import Measures
 from src.measures.stats import AnimalStatistics
 from fpdf import FPDF
@@ -14,6 +16,7 @@ from humobi.measures.individual import *
 from humobi.tools.processing import *
 from humobi.tools.user_statistics import *
 from constans import const
+import scipy.stats as scp_stats
 
 sns.set_style("whitegrid")
 
@@ -30,7 +33,7 @@ class Curves:
     """
 
     @staticmethod
-    def linear(x, a, b):
+    def linear(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
         Computes a linear transformation: y = a * x * b.
 
@@ -46,7 +49,7 @@ class Curves:
         return a * x * b
 
     @staticmethod
-    def expon(x, a, b):
+    def expon(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
         Computes an exponential curve: y = a * x^b.
 
@@ -62,7 +65,7 @@ class Curves:
         return a * np.power(x, b)
 
     @staticmethod
-    def expon_neg(x, a, b):
+    def expon_neg(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
         Computes a negative exponential curve: y = a * x^(-b).
 
@@ -78,7 +81,7 @@ class Curves:
         return a * pow(x, -b)
 
     @staticmethod
-    def euler(x, a, b):
+    def euler(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
         Computes an Euler's exponential curve: y = a * e^(b * x).
 
@@ -94,7 +97,7 @@ class Curves:
         return a * np.exp(b * x)
 
     @staticmethod
-    def power(x, a, b):
+    def power(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
         Computes a power curve: y = a * b^x.
 
@@ -110,7 +113,7 @@ class Curves:
         return a * pow(b, x)
 
     @staticmethod
-    def power_neg(x, a, b):
+    def power_neg(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
         Computes a negative power curve: y = a * b^(-x).
 
@@ -126,7 +129,7 @@ class Curves:
         return a * pow(b, -x)
 
     @staticmethod
-    def logar(x, a, b):
+    def logar(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
         Computes a logarithmic curve: y = a + b * log(x).
 
@@ -142,7 +145,7 @@ class Curves:
         return a + b * np.log(x)
 
     @staticmethod
-    def cubic(x, a, b, c, d):
+    def cubic(x: np.ndarray, a: float, b: float, c: float, d: float) -> np.ndarray:
         """
         Computes a cubic curve: y = a*x^3 + b*x^2 + c*x + d.
 
@@ -158,7 +161,7 @@ class Curves:
         return a * x**3 + b * x**2 + c * x + d
 
     @staticmethod
-    def sigmoid(x, a, b):
+    def sigmoid(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
         Computes a sigmoid curve: y = 1 / (1 + exp(a*x + b)).
 
@@ -174,7 +177,7 @@ class Curves:
         return 1 / (1 + np.exp(a * x + b))
 
     @staticmethod
-    def quad(x, a, b, c):
+    def quad(x: np.ndarray, a: float, b: float, c: float) -> np.ndarray:
         """
         Computes a quadratic curve: y = a*x^2 + b*x + c.
 
@@ -191,13 +194,16 @@ class Curves:
         return a * x**2 + b * x + c
 
     @staticmethod
-    def four(x, a, b, c, d, e):
+    def four(
+        x: np.ndarray, a: float, b: float, c: float, d: float, e: float
+    ) -> np.ndarray:
         """
         Computes a quartic curve: y = a*x^4 + b*x^3 + c*x^2 + d*x + e.
 
         Parameters:
         x (array-like): Input values.
-        a, b, c, d, e (float): Coefficients for quartic, cubic, quadratic, linear, and constant terms.
+        a, b, c, d, e (float): Coefficients for quartic, cubic,
+        quadratic, linear, and constant terms.
 
         Returns:
         array-like: Transformed values.
@@ -206,7 +212,7 @@ class Curves:
         return a * x**4 + b * x**3 + c * x**2 + d * x + e
 
     @staticmethod
-    def zipf(x, a, b):
+    def zipf(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
         Computes a Zipf curve: y = 1 / (x + a)^b.
 
@@ -219,6 +225,173 @@ class Curves:
         array-like: Transformed values.
         """
         return 1 / (x + a) ** b
+
+
+class DistributionFitingTools:
+    """
+    A class containing tools for fitting distributions and models to data.
+    """
+
+    def __init__(self) -> None:
+        self.curves = Curves()
+
+    def _fit_distribution(self, data, distribution) -> float:
+        """
+        Fits a given distribution to the data
+
+        Parameters:
+        ----------
+        data : numpy.ndarray
+            The data to which the distribution is fitted.
+        distribution : scipy.stats.rv_continuous
+            The distribution to fit to the data.
+
+        Returns:
+        -------
+        float
+        """
+        params = distribution.fit(data)
+        arg = params[:-2]
+        loc = params[-2]
+        scale = params[-1]
+        pdf_values = distribution.pdf(data, loc=loc, scale=scale, *arg)
+        log_likelihood = np.sum(np.log(pdf_values))
+        num_params = len(params)
+        aic = 2 * len(params) - 2 * log_likelihood
+        aicc = aic + (2 * num_params * (num_params + 1)) / (
+            len(data) - num_params - 1
+        )  # AICc correction
+        return aicc
+
+    def _calculate_akaike_weights(self, aic_values) -> np.ndarray:
+        """
+        Calculates Akaike weights from AIC values.
+
+        Parameters:
+        ----------
+        aic_values : list of float
+            The list of AIC values for different models.
+
+        Returns:
+        -------
+        numpy.ndarray
+            The Akaike weights corresponding to each AIC value.
+        """
+        delta_aic = aic_values - np.min(aic_values)
+        exp_term = np.exp(-0.5 * delta_aic)
+        weights = exp_term / np.sum(exp_term)
+        return weights
+
+    def _multiple_distributions(self, data) -> tuple:
+        """
+        Fits multiple distributions to the data and selects
+        the best one based on AICc.
+
+        Parameters:
+        ----------
+        data : numpy.ndarray
+            The data to which the distributions are fitted.
+
+        Returns:
+        -------
+        tuple
+            The best fitting distribution and weights of results
+        """
+        distributions = [
+            scp_stats.lognorm,
+            scp_stats.expon,
+            scp_stats.powerlaw,
+            scp_stats.norm,
+            scp_stats.pareto,
+        ]
+
+        aic_values = []
+
+        for distribution in distributions:
+            current_aic = self._fit_distribution(data, distribution)
+            aic_values.append(current_aic)
+
+        weights = self._calculate_akaike_weights(aic_values)
+
+        best_index = np.nanargmin(aic_values)
+        best_distribution = distributions[best_index]
+
+        return best_distribution, weights
+
+    def model_choose(self, vals) -> tuple:
+        """
+        Chooses the best fitting model from a set of predefined curves
+        based on AICc.
+
+        Parameters:
+        ----------
+        vals : pandas.Series
+            The data to which the models are fitted.
+
+        Returns:
+        -------
+        tuple
+            The best fit model, its name, parameters, and a DataFrame
+            containing model information.
+        """
+        scores = {}
+        parameters = {}
+        expon_pred = None
+        for c in [
+            self.curves.linear,
+            self.curves.expon,
+            self.curves.expon_neg,
+            self.curves.sigmoid,
+        ]:
+            try:
+                params, covar = curve_fit(c, vals.index.values, vals.values)
+                num_params = len(params)
+
+                y_pred = c(vals.index, *params)
+                if c.__name__ == "expon":
+                    expon_pred = y_pred
+                residuals = vals.values - y_pred
+
+                aic = len(vals.index) * np.log(np.mean(residuals**2)) + 2 * len(params)
+                aicc = aic + (2 * num_params * (num_params + 1)) / (
+                    len(vals) - num_params - 1
+                )
+                scores[c] = aicc
+                parameters[c] = params
+
+            except ValueError as e:
+                logging.error(e)
+                continue
+
+        min_aicc = min(scores, key=scores.get)  # type: ignore
+        min_aicc = scores[min_aicc]
+        waicc = {k: v - min_aicc for k, v in scores.items()}
+        waicc = {k: np.exp(-0.5 * v) for k, v in waicc.items()}
+        waicc = {k: v / np.sum(list(waicc.values())) for k, v in waicc.items()}
+
+        global_params = pd.DataFrame(columns=["curve", "weight", "param1", "param2"])
+        for (key1, value1), (key2, value2) in zip(waicc.items(), parameters.items()):
+            if key1 == key2:
+                global_params = global_params._append(
+                    {
+                        "curve": key2.__name__,
+                        "weight": round(value1, 25),
+                        "param1": round(value2[0], 25),
+                        "param2": round(value2[1], 25),
+                    },
+                    ignore_index=True,
+                )  # type: ignore
+
+        best_fit = max(waicc, key=waicc.get)  # type: ignore
+        params, _ = curve_fit(best_fit, vals.index.values, vals.values)
+
+        return (
+            best_fit(vals.index, *params),
+            best_fit.__name__,
+            params,
+            global_params,
+            expon_pred,
+        )
 
 
 class Stats:
@@ -268,9 +441,7 @@ class Stats:
         return max_end - min_start
 
     @staticmethod
-    def get_min_labels_no_after_filtration(
-        data: TrajectoriesFrame
-    ) -> pd.Series:
+    def get_min_labels_no_after_filtration(data: TrajectoriesFrame) -> pd.Series:
         """
         Get the users with the minimum number of unique labels
         after filtration.
@@ -284,14 +455,10 @@ class Stats:
         """
         unique_label_counts = data.groupby("user_id")["labels"].nunique()
         min_unique_label_count = unique_label_counts.min()
-        return unique_label_counts[
-            unique_label_counts == min_unique_label_count
-        ]
+        return unique_label_counts[unique_label_counts == min_unique_label_count]
 
     @staticmethod
-    def get_min_records_no_before_filtration(
-        data: TrajectoriesFrame
-    ) -> pd.Series:
+    def get_min_records_no_before_filtration(data: TrajectoriesFrame) -> pd.Series:
         """
         Get the animals with the minimum number of records
         before filtration.
@@ -498,23 +665,13 @@ class Prepocessing:
                     ignore_index=True,
                 )  # type: ignore
 
-        return TrajectoriesFrame(
-            geometry_df.sort_values("datetime").drop_duplicates()
-        )
+        return TrajectoriesFrame(geometry_df.sort_values("datetime").drop_duplicates())
 
     @staticmethod
     def set_start_stop_time(data: TrajectoriesFrame) -> TrajectoriesFrame:
         compressed = pd.DataFrame(
             start_end(data).reset_index()[
-                [
-                    "user_id",
-                    "datetime",
-                    "labels",
-                    "lat",
-                    "lon",
-                    "date",
-                    "start",
-                    "end"]
+                ["user_id", "datetime", "labels", "lat", "lon", "date", "start", "end"]
             ]
         )
         return TrajectoriesFrame(
@@ -572,18 +729,14 @@ class Prepocessing:
 
             return TrajectoriesFrame(
                 data_without_nans.loc[
-                    distinct_locations[
-                        distinct_locations > quartile_value
-                    ].index
+                    distinct_locations[distinct_locations > quartile_value].index
                 ]
             )
 
 
 class Laws:
 
-    def __init__(
-            self, pdf_object: FPDF, stats_dict: dict, output_path: str
-    ) -> None:
+    def __init__(self, pdf_object: FPDF, stats_dict: dict, output_path: str) -> None:
         self.pdf_object = pdf_object
         self.output_path = output_path
 
