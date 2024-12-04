@@ -491,7 +491,8 @@ class Stats:
         Returns:
             float: The mean period in days.
         """
-        return (data["end"] - data["start"]).mean()  # type: ignore
+
+        return (data.groupby('user_id')["end"].max() - data.groupby('user_id')["start"].min()).mean()  # type: ignore
 
     @staticmethod
     def get_min_periods(data: TrajectoriesFrame) -> pd.Timedelta:
@@ -505,7 +506,7 @@ class Stats:
         Returns:
             float: The minimum period in days.
         """
-        return (data["end"] - data["start"]).min()  # type: ignore
+        return (data.groupby('user_id')["end"].max() - data.groupby('user_id')["start"].min()).min()  # type: ignore
 
     @staticmethod
     def get_max_periods(data: TrajectoriesFrame) -> pd.Timedelta:
@@ -519,7 +520,7 @@ class Stats:
         Returns:
             float: The maximum period in days.
         """
-        return (data["end"] - data["start"]).max()  # type: ignore
+        return (data.groupby('user_id')["end"].max() - data.groupby('user_id')["start"].min()).max()  # type: ignore
 
     @staticmethod
     def get_overall_area(data: TrajectoriesFrame) -> float:
@@ -596,7 +597,7 @@ class DataSetStats:
     def __init__(self, output_dir) -> None:
         self.output_dir = output_dir
         self.record = {}
-        self.stats_frame = pd.DataFrame(
+        self.stats_set = pd.DataFrame(
             columns=[
                 "animal",
                 "animal_no",
@@ -640,8 +641,9 @@ class DataSetStats:
         self.record.update(data)
 
     def add_record(self) -> None:
-        self.stats_frame._append(self.record, ignore_index=True)  # type: ignore
+        self.stats_set = pd.concat([self.stats_set, pd.DataFrame([self.record])], ignore_index=True)  # type: ignore
         self.record = {}
+
 
 
 class Prepocessing:
@@ -693,11 +695,9 @@ class Prepocessing:
         base_csr: int = const.ELLIPSOIDAL_CRS,
         target_crs: int = const.CARTESIAN_CRS,
     ) -> TrajectoriesFrame:
+        data_frame = data.copy().set_crs(base_csr) # type: ignore
 
-        data.set_crs(base_csr)
-        data.to_crs(target_crs)
-
-        return data
+        return data_frame.to_crs(target_crs)
 
     @staticmethod
     def filter_by_min_number(
@@ -782,16 +782,27 @@ class Laws:
         try:
             y_position = self.pdf_object.get_y()
             self.pdf_object.image(
-                plot_obj,
-                x=x_position,
-                y=y_position,
-                w=image_width,
-                h=image_height
+                plot_obj, x=x_position, y=y_position, w=image_width, h=image_height
             )
             self.pdf_object.set_y(y_position + image_height + 10)
             plot_obj.close()
         except Exception as e:
             raise RuntimeError(f"Failed to add plot to PDF: {e}")
+
+    def _add_pdf_table(self, data):
+        self.pdf_object.ln(10)  # Nowa linia
+        self.pdf_object.cell(40, 10, "Curve", border=1, align="C")
+        self.pdf_object.cell(40, 10, "Weight", border=1, align="C")
+        self.pdf_object.cell(40, 10, "Param1", border=1, align="C")
+        self.pdf_object.cell(40, 10, "Param2", border=1, align="C")
+        self.pdf_object.ln()
+
+        for index, row in data.iterrows():
+            self.pdf_object.cell(40, 10, row["curve"], border=1, align="C")
+            self.pdf_object.cell(40, 10, str(row["weight"]), border=1, align="C")
+            self.pdf_object.cell(40, 10, str(row["param1"]), border=1, align="C")
+            self.pdf_object.cell(40, 10, str(row["param2"]), border=1, align="C")
+            self.pdf_object.ln()
 
     def _plot_curve(self, func_name, plot_data, y_pred, labels, exp_y_pred=None):
         buffer = BytesIO()
@@ -801,15 +812,18 @@ class Laws:
         fig = plt.figure(figsize=(8, 5))
         # ax = fig.add_subplot(1, 1, 1)
 
-        plt.plot(plot_data.index, y_pred, c="k", label='Sigmoid')
-        if exp_y_pred:
-            plt.plot(plot_data.index, y_pred, c="r", label ='Expon neg')
+        if exp_y_pred is not None and exp_y_pred.size > 0:
+            plt.plot(plot_data.index, y_pred, c="k", label="Sigmoid")
+            plt.plot(plot_data.index, y_pred, c="r", label="Expon neg")
+            plt.legend(loc="lower left")
+        else:
+            plt.plot(plot_data.index, y_pred, c="k")
 
         plt.scatter(plot_data.index, plot_data)
         plt.loglog()
         plt.xlabel(labels[0])
         plt.ylabel(labels[1])
-        plt.legend(loc="lower left")
+
         plt.savefig(
             os.path.join(
                 self.output_path,
@@ -821,41 +835,48 @@ class Laws:
         buffer.seek(0)
         return buffer
 
-
     def log_curve_fitting_resluts(func):
         def wrapper(self, *args, **kwargs):
             func_name, best_fit, param_frame, plot_obj = func(self, *args, **kwargs)
-            filtered_df = param_frame[param_frame['name'] == best_fit]
-            self.stats_frame.add_data({best_fit: filtered_df[['param1', 'param2']].values.tolist()})
+            filtered_df = param_frame[param_frame["curve"] == best_fit]
 
-            self._add_pdf_cell(f'{func_name}')
-            self._add_pdf_cell(f'{best_fit} with params: {filtered_df[["param1", "param2"]]}')
-            self._add_pdf_cell()
+            self.stats_frame.add_data({func_name: best_fit})
+            self.stats_frame.add_data(
+                {
+                    f"{func_name}_params": filtered_df[
+                        ["param1", "param2"]
+                    ].values.tolist()
+                }
+            )
+
+            self._add_pdf_cell(f"{func_name}")
+            self._add_pdf_cell(
+                f'{best_fit} with params: {filtered_df[["param1", "param2"]]}'
+            )
+            self._add_pdf_table(param_frame)
             self._add_pdf_plot(plot_obj, 200, 100)
 
         return wrapper
-
 
     def check_curve_fit(func):
         def wrapper(self, *args, **kwargs):
             best_fit, param_frame, y_pred, exp_y_pred, plot_data, labels = func(
                 self, *args, **kwargs
-            ) # type: ignore
-            self._plot_curve()
-            if best_fit not in {'linear', 'expon', 'expon_neg'}:
+            )  # type: ignore
+            if best_fit not in {"linear", "expon", "expon_neg"}:
                 plot_obj = self._plot_curve(
                     func.__name__, plot_data, y_pred, labels, exp_y_pred
                 )
-                return best_fit, param_frame, plot_obj
-            else:
-                plot_obj = self._plot_curve(
-                    func.__name__, plot_data, y_pred, labels
-                )
                 return func.__name__, best_fit, param_frame, plot_obj
+            else:
+                plot_obj = self._plot_curve(func.__name__, plot_data, y_pred, labels)
+                return func.__name__, best_fit, param_frame, plot_obj
+
         return wrapper
 
+    @log_curve_fitting_resluts
     @check_curve_fit
-    def visitation_frequency(self, data:TrajectoriesFrame, min_labels_no:int):
+    def visitation_frequency(self, data: TrajectoriesFrame, min_labels_no: int):
         vf = visitation_frequency(data)
         avg_vf = rowwise_average(vf, row_count=min_labels_no)
         avg_vf.index += 1
@@ -866,10 +887,11 @@ class Laws:
             self.curve_fitting.model_choose(avg_vf)
         )
 
-        return best_fit, global_params, y_pred, expon_y_pred, avg_vf, ['f','Rank']
+        return best_fit, global_params, y_pred, expon_y_pred, avg_vf, ["f", "Rank"]
 
-
-    def distinct_locations_over_time(self, data:TrajectoriesFrame, min_labels_no:int):
+    @log_curve_fitting_resluts
+    @check_curve_fit
+    def distinct_locations_over_time(self, data: TrajectoriesFrame, min_labels_no: int):
 
         dlot = distinct_locations_over_time(data)
         avg_dlot = rowwise_average(dlot, row_count=min_labels_no)
@@ -881,9 +903,9 @@ class Laws:
             DistributionFitingTools().model_choose(avg_dlot)
         )
 
-        return best_fit, global_params, y_pred, expon_y_pred, ['S(t)','t']
+        return best_fit, global_params, y_pred, expon_y_pred, avg_dlot, ["S(t)", "t"]
 
-    def jump_lengths_distribution(self, data:TrajectoriesFrame):
+    def jump_lengths_distribution(self, data: TrajectoriesFrame):
         jl = jump_lengths(data)
         jl = jl[jl != 0]
         jl_dist = convert_to_distribution(jl, num_of_classes=20)
@@ -893,36 +915,33 @@ class Laws:
         model = distfit(stats="wasserstein")
         model.fit_transform(jl.values)
 
-
-    def waiting_times(self, data:TrajectoriesFrame):
+    def waiting_times(self, data: TrajectoriesFrame):
         data_set = data.copy()
         try:
             wt = data_set.groupby(level=0).apply(
                 lambda x: (x.end - x.start).dt.total_seconds().round()
             )
         except:
-            wt = (data_set['end'] - data_set['start']).dt.total_seconds().round()
+            wt = (data_set["end"] - data_set["start"]).dt.total_seconds().round()
 
-        wt = wt[~wt.isna()] # type: ignore
+        wt = wt[~wt.isna()]  # type: ignore
         wt = wt[wt != 0]
 
         # Fit to find the best theoretical distribution
         model = distfit(stats="wasserstein")
         model.fit_transform(wt.values)
-        logging.info(f'Best fit: {model.model["name"]},{ model.model["params"]}')
 
-
-    def travel_times(self, data:TrajectoriesFrame):
+    def travel_times(self, data: TrajectoriesFrame):
         data_set = data.copy()
         try:
             tt = (
                 data_set.groupby(level=0)
-                .progress_apply(lambda x: x.shift(-1).start - x.end) # type: ignore
+                .progress_apply(lambda x: x.shift(-1).start - x.end)  # type: ignore
                 .reset_index(level=[1, 2], drop=True)
             )
         except:
-            shifted_start = data_set['start'].shift(-1)
-            tt = shifted_start - data_set['end']
+            shifted_start = data_set["start"].shift(-1)
+            tt = shifted_start - data_set["end"]
             tt = tt.reset_index(drop=True)
 
         tt = tt.dt.total_seconds()
@@ -932,14 +951,16 @@ class Laws:
         model = distfit(stats="wasserstein")
         model.fit_transform(tt.values)
 
-    def rog(self, data:TrajectoriesFrame):
+    def rog(self, data: TrajectoriesFrame):
         rog = radius_of_gyration(data, time_evolution=False)
 
         # Fit to find the best theoretical distribution
         model = distfit(stats="RSS")
         model.fit_transform(rog.values)
 
-    def rog_over_time(self, data:TrajectoriesFrame):
+    @log_curve_fitting_resluts
+    @check_curve_fit
+    def rog_over_time(self, data: TrajectoriesFrame):
         rog = radius_of_gyration(data, time_evolution=True)
         avg_rog = rowwise_average(rog)
         avg_rog = avg_rog[~avg_rog.isna()]
@@ -949,24 +970,26 @@ class Laws:
             DistributionFitingTools().model_choose(avg_rog)
         )
 
-        return best_fit, global_params, y_pred, expon_y_pred, ['Time','Values']
-
-
-    def msd_distribution(self, data:TrajectoriesFrame):
-        msd = mean_square_displacement(
-            data, time_evolution=False, from_center=True
+        return (
+            best_fit,
+            global_params,
+            y_pred,
+            expon_y_pred,
+            avg_rog,
+            ["Time", "Values"],
         )
+
+    def msd_distribution(self, data: TrajectoriesFrame):
+        msd = mean_square_displacement(data, time_evolution=False, from_center=True)
 
         # Fit to find the best theoretical distribution
         model = distfit(stats="wasserstein")
         model.fit_transform(msd.values)
 
-    def msd_curve(self, data:TrajectoriesFrame, min_records_no:int):
-        msd = mean_square_displacement(
-            data,
-            time_evolution=True,
-            from_center=False
-        )
+    @log_curve_fitting_resluts
+    @check_curve_fit
+    def msd_curve(self, data: TrajectoriesFrame, min_records_no: int):
+        msd = mean_square_displacement(data, time_evolution=True, from_center=False)
         avg_msd = rowwise_average(msd, row_count=min_records_no)
         avg_msd = avg_msd[~avg_msd.isna()]
         # model selection
@@ -974,21 +997,16 @@ class Laws:
             DistributionFitingTools().model_choose(avg_msd)
         )
 
-        return best_fit, global_params, y_pred, expon_y_pred, ['MSD','t']
+        return best_fit, global_params, y_pred, expon_y_pred, avg_msd, ["MSD", "t"]
 
-    def return_time_distribution(self, data:TrajectoriesFrame):
+    def return_time_distribution(self, data: TrajectoriesFrame):
         to_concat = {}
         data_set = data.copy()
         for uid, vals in tqdm(
             data_set.groupby(level=0),
             total=len(pd.unique(data_set.index.get_level_values(0))),
         ):
-            vals = vals.sort_index()[
-                [
-                "labels",
-                "start",
-                "end"]
-                ]
+            vals = vals.sort_index()[["labels", "start", "end"]]
 
             vals["new_place"] = ~vals["labels"].duplicated(keep="first")
             vals["islands"] = vals["new_place"] * (
@@ -1001,8 +1019,8 @@ class Laws:
             vals = vals[vals.islands > 0]
 
             result = vals.groupby("islands").apply(
-                lambda x: x.iloc[-1].start - x.iloc[0].start if len(x) > 0 else None # type: ignore
-            ) # type: ignore
+                lambda x: x.iloc[-1].start - x.iloc[0].start if len(x) > 0 else None  # type: ignore
+            )  # type: ignore
             result = result.dt.total_seconds()
             to_concat[uid] = result
 
@@ -1016,25 +1034,14 @@ class Laws:
         model = distfit(stats="wasserstein")
         model.fit_transform(rt.values)
 
-
-    def exploration_time(self, data:TrajectoriesFrame):
+    def exploration_time(self, data: TrajectoriesFrame):
         to_concat = {}
         data_set = data.copy()
         for uid, vals in tqdm(
             data_set.groupby(level=0),
-            total=len(
-                pd.unique(
-                    data_set.index.get_level_values(0)
-                    )
-                ),
+            total=len(pd.unique(data_set.index.get_level_values(0))),
         ):
-            vals = vals.sort_index()[
-                [
-                    "labels",
-                    "start",
-                    "end"
-                    ]
-                ]
+            vals = vals.sort_index()[["labels", "start", "end"]]
 
             vals["old_place"] = vals["labels"].duplicated(keep="first")
             vals["islands"] = vals["old_place"] * (
@@ -1047,8 +1054,8 @@ class Laws:
             vals = vals[vals.islands > 0]
 
             result = vals.groupby("islands").apply(
-                lambda x: x.iloc[-1].start - x.iloc[0].start if len(x) > 0 else None # type: ignore
-            ) # type: ignore
+                lambda x: x.iloc[-1].start - x.iloc[0].start if len(x) > 0 else None  # type: ignore
+            )  # type: ignore
             if result.size == 0:
                 continue
             result = result.dt.total_seconds()
@@ -1061,7 +1068,6 @@ class Laws:
         # Fit to find the best theoretical distribution
         model = distfit(stats="wasserstein")
         model.fit_transform(et.values)
-
 
 
 class ScalingLawsCalc:
@@ -1103,28 +1109,88 @@ class ScalingLawsCalc:
         converted_to_cartesian = preproc.set_crs(compressed_points)
         filtered_animals = preproc.filter_by_quartiles(converted_to_cartesian)
 
-        print("RAW ANIMAL NO:", stats.get_animals_no(self.data))
-        print("FILTRED ANIMAL NO:", stats.get_animals_no(filtered_animals))
-
-        print("RAW ANIMAL PERIOD:", stats.get_period(filtered_animals))
-        print("FILTRED ANIMAL PERIOD:", stats.get_period(filtered_animals))
-
-        print(
-            "MIN RECORDS NO BEF FILTRATION :",
-            stats.get_min_records_no_before_filtration(self.data),
+        self.stats_frame.add_data({"animal_no": stats.get_animals_no(self.data)})
+        self.stats_frame.add_data(
+            {"animal_after_filtration": stats.get_animals_no(filtered_animals)}
         )
-        print(
-            "MIN LABELS NO AFTER FILTRATION :",
-            stats.get_min_labels_no_after_filtration(filtered_animals),
+        self.stats_frame.add_data({"time_period": stats.get_period(filtered_animals)})
+
+        self.stats_frame.add_data(
+            {
+                'min_label_no': [
+                    [f'user_id : {index}', f'no: {value}']
+                    for index, value in
+                    stats.get_min_labels_no_after_filtration(
+                        filtered_animals
+                    ).items()
+                ]
+            }
         )
+
+        self.stats_frame.add_data({
+            'min_records': [
+                [f'user_id : {index}', f'no: {value}']
+                for index, value in
+                stats.get_min_records_no_before_filtration(
+                    self.data
+                ).items()
+            ]
+        })
+
+        self.stats_frame.add_data(
+            {"avg_duration": stats.get_mean_periods(filtered_animals)}
+        )
+        self.stats_frame.add_data(
+            {"min_duration": stats.get_min_periods(filtered_animals)}
+        )
+        self.stats_frame.add_data(
+            {"max_duration": stats.get_max_periods(filtered_animals)}
+        )
+        self.stats_frame.add_data(
+            {"overall_set_area": stats.get_overall_area(filtered_animals)}
+        )
+        self.stats_frame.add_data(
+            {"average_set_area": stats.get_mean_area(filtered_animals)}
+        )
+        self.stats_frame.add_data({"min_area": stats.get_min_area(filtered_animals)})
+        self.stats_frame.add_data({"max_area": stats.get_max_area(filtered_animals)})
 
         # FIXME: choose data for compressed csv and next step of calculations
         return compressed_points, filtered_animals
 
     def process_file(self) -> None:
 
+        self.stats_frame.add_data({"animal": self.animal_name})
+
         compressed_points, filtered_animals = self._preprocess_data()
 
-        laws = Laws(pdf_object=self.pdf, stats_dict=self.stats_frame, output_path=self.output_dir_animal)
+        min_label_no = [
+                    [value]
+                    for index, value in
+                    Stats().get_min_labels_no_after_filtration(
+                        filtered_animals
+                    ).items()
+                ][0][0]
 
-        l = laws.visitation_frequency(filtered_animals, 14)
+        min_records = [
+                [value]
+                for index, value in
+                Stats().get_min_records_no_before_filtration(
+                    self.data
+                ).items()
+            ][0][0]
+
+        laws = Laws(
+            pdf_object=self.pdf,
+            stats_frame=self.stats_frame,
+            output_path=self.output_dir_animal,
+        )
+        laws.visitation_frequency(filtered_animals, min_label_no)
+        laws.distinct_locations_over_time(filtered_animals, min_label_no)
+        laws.rog_over_time(filtered_animals)
+        laws.msd_curve(filtered_animals, min_records)
+
+        pdf_path = os.path.join(self.output_dir_animal, f"{self.animal_name}.pdf")
+        self.pdf.output(pdf_path)
+
+        self.stats_frame.add_record()
