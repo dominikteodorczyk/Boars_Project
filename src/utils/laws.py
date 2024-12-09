@@ -848,7 +848,7 @@ class Flexation:
                         ],  # left model score from distfit
                         "left_score_calc": left_score_calc,  # left model score from our calc
                         "right_model": right_model.model["name"],  # right model name
-                        "right_score": right_model.summary.sort_values("score")[ # type: ignore
+                        "right_score": right_model.summary.sort_values("score")[  # type: ignore
                             "score"
                         ].iloc[
                             0
@@ -862,17 +862,17 @@ class Flexation:
                 pass
         return fitting_results.sort_values("right_score", ascending=True)
 
-    def _find_flexation_points(self, data:pd.Series) -> list:
+    def _find_flexation_points(self, data: pd.Series) -> list:
         penalty = self._calculate_penalty(data)
         model = rpt.Pelt(model="rbf").fit(data)
         return model.predict(pen=penalty)
 
-    def find_distributions(self, model, data:pd.Series):
+    def find_distributions(self, model, data: pd.Series):
         flexation_points = self._find_flexation_points(data)
         fitting_results = self._fit_mixed_models(data, flexation_points)
 
-        fitting_score = fitting_results['right_score'].iloc[0]
-        best_point = fitting_results.iloc[0]['point']
+        fitting_score = fitting_results["right_score"].iloc[0]
+        best_point = fitting_results.iloc[0]["point"]
 
         main_model_score = self._calc_main_model_wasser(model, data, best_point)
 
@@ -1033,6 +1033,83 @@ class Laws:
         buffer_plot_model.seek(0)
         return buffer_plot_distribution, buffer_plot_model
 
+    def _plot_doupble_distribution(
+        self,
+        left_model,
+        right_model,
+        left_values,
+        right_values,
+        flexation_point,
+        measure_type: str = "Values",
+    ):
+
+        measure_type = (
+            measure_type.replace("_", " ").replace("distribution", "").capitalize()
+        )
+
+        buffer_plot_distribution = BytesIO()
+        buffer_plot_model = BytesIO()
+
+        sns.set_style("whitegrid")
+
+        plt.figure(figsize=(12, 5))
+        plt.hist(
+            left_values,
+            bins=50,
+            density=True,
+            alpha=0.5,
+            label="Left Set",
+            color="grey",
+        )
+        plt.hist(
+            right_values,
+            bins=50,
+            density=True,
+            alpha=0.5,
+            label="Right Set",
+            color="orange",
+        )
+        plt.loglog()
+
+        plt.savefig(
+            os.path.join(
+                self.output_path,
+                f"{measure_type}_distribution_with_flexation_point_{flexation_point}.png",
+            )
+        )
+        plt.savefig(buffer_plot_distribution, format="png")
+        plt.close()
+        buffer_plot_distribution.seek(0)
+
+        left_model.plot(
+            pdf_properties={"color": "#472D30", "linewidth": 4, "linestyle": "--"},
+            bar_properties=None,
+            cii_properties=None,
+            emp_properties={"color": "#E26D5C", "linewidth": 0, "marker": "o"},
+            figsize=(8, 5),
+        )
+
+        right_model.plot(
+            pdf_properties={"color": "#472D30", "linewidth": 4, "linestyle": "--"},
+            bar_properties=None,
+            cii_properties=None,
+            emp_properties={"color": "#E26D5C", "linewidth": 0, "marker": "o"},
+            figsize=(8, 5),
+        )
+
+        plt.legend()
+        plt.grid()
+
+        plt.savefig(
+            os.path.join(
+                self.output_path,
+                f"{measure_type}_model_distribution_with_flexation_point_{flexation_point}.png",
+            )
+        )
+        plt.savefig(buffer_plot_model, format="png")
+        plt.close()
+        buffer_plot_model.seek(0)
+        return buffer_plot_distribution, buffer_plot_model
 
     def log_curve_fitting_resluts(func):
         def wrapper(self, *args, **kwargs):
@@ -1080,20 +1157,25 @@ class Laws:
 
         return wrapper
 
-    def flexation_point(self):
-        # TODO: fucktion to calcluate
-        pass
-
     def check_distribution_fit(func):
         def wrapper(self, *args, **kwarg):
             model, data = func(self, *args, **kwargs)
             if model.model["name"] not in const.DISTRIBUTIONS:
-                # TODO: distribution flexation points logic
-
                 buffer_plot_distribution, buffer_plot_model = self._plot_distribution(
                     model, data, func.__name__
                 )
-                return model, buffer_plot_distribution, buffer_plot_model
+                flexation_point_detection_results = Flexation().find_distributions(
+                    model, data.values
+                )
+                if len(flexation_point_detection_results) == 6:
+                    return (
+                        model,
+                        buffer_plot_distribution,
+                        buffer_plot_model,
+                        flexation_point_detection_results,
+                    )
+                else:
+                    return model, buffer_plot_distribution, buffer_plot_model
             else:
                 buffer_plot_distribution, buffer_plot_model = self._plot_distribution(
                     model, data, func.__name__
