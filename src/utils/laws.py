@@ -20,6 +20,9 @@ import scipy.stats as scp_stats
 from distfit import distfit
 from functools import wraps
 from io import BytesIO
+from math import log
+from scipy.stats import wasserstein_distance
+import ruptures as rpt
 
 sns.set_style("whitegrid")
 
@@ -738,6 +741,155 @@ class Prepocessing:
             )
 
 
+class Flexation:
+
+    def __init__(self) -> None:
+        pass
+
+    def _calculate_penalty(self, data):
+        if const.FLEXATION_POINTS_SENSITIVITY == "Low":
+            return 6 * log(len(data))
+        elif const.FLEXATION_POINTS_SENSITIVITY == "Medium":
+            return 3 * log(len(data))
+        elif const.FLEXATION_POINTS_SENSITIVITY == "High":
+            return 1.5 * log(len(data))
+
+    def _calc_main_model_wasser(
+        self, model_obj: distfit, data: pd.Series, flexation_point: int
+    ) -> float:
+
+        left_set = data[data <= flexation_point]
+        right_set = data[data >= flexation_point]
+
+        main_dfit = distfit()
+
+        left_main_bins, left_main_empiric_density = main_dfit.density(
+            X=left_set, bins=len(left_set)
+        )
+        right_main_bins, right_main_empiric_density = main_dfit.density(
+            X=right_set, bins=len(right_set)
+        )
+
+        left_main_model_density = model_obj.model["model"].pdf(left_main_bins)
+        right_main_model_density = model_obj.model["model"].pdf(right_main_bins)
+
+        empiric_density = np.concatenate(
+            (left_main_empiric_density, right_main_empiric_density)
+        )
+        model_density = np.concatenate(
+            (left_main_model_density, right_main_model_density)
+        )
+
+        return wasserstein_distance(empiric_density, model_density)
+
+    def _fit_mixed_models(
+        self, data: pd.Series, flexation_points: list
+    ) -> pd.DataFrame:
+        fitting_results = pd.DataFrame(
+            columns=[
+                "point",
+                "left_model",
+                "left_score",
+                "left_score_calc",
+                "right_model",
+                "right_score",
+                "right_score_calc",
+                "overall_score",
+            ]
+        )
+
+        for point in flexation_points:
+            left_set = data[data <= point]
+            right_set = data[data >= point]
+
+            if left_set.size >= 5 and right_set.size >= 5:
+                left_model = distfit(stats="wasserstein")
+                right_model = distfit(stats="wasserstein")
+
+                left_model.fit_transform(left_set)
+                right_model.fit_transform(right_set)
+
+                left_dfit = distfit()
+                left_bins, left_empiric_density = left_dfit.density(
+                    X=left_set, bins=len(left_set)
+                )
+                left_model_density = left_model.model["model"].pdf(left_bins)
+
+                right_dfit = distfit()
+                right_bins, right_empiric_density = right_dfit.density(
+                    X=right_set, bins=len(right_set)
+                )
+                right_model_density = right_model.model["model"].pdf(right_bins)
+
+                left_score_calc = wasserstein_distance(
+                    left_empiric_density, left_model_density
+                )
+                right_score_calc = wasserstein_distance(
+                    right_empiric_density, right_model_density
+                )
+
+                empiric_density = np.concatenate(
+                    (left_empiric_density, right_empiric_density)
+                )
+                model_density = np.concatenate(
+                    (left_model_density, right_model_density)
+                )
+
+                overall_score = wasserstein_distance(empiric_density, model_density)
+
+                fitting_results = fitting_results._append(
+                    {
+                        "point": point,  # flexation point
+                        "left_model": left_model.model["name"],  # left model name
+                        "left_score": left_model.summary.sort_values("score")[
+                            "score"
+                        ].iloc[
+                            0
+                        ],  # left model score from distfit
+                        "left_score_calc": left_score_calc,  # left model score from our calc
+                        "right_model": right_model.model["name"],  # right model name
+                        "right_score": right_model.summary.sort_values("score")[ # type: ignore
+                            "score"
+                        ].iloc[
+                            0
+                        ],  # right model score from distfit
+                        "right_score_calc": right_score_calc,  # right model score from our calc
+                        "overall_score": overall_score,  # wasserstein calculated for mix-distribution approach
+                    },
+                    ignore_index=True,
+                )
+            else:
+                pass
+        return fitting_results.sort_values("right_score", ascending=True)
+
+    def _find_flexation_points(self, data:pd.Series) -> list:
+        penalty = self._calculate_penalty(data)
+        model = rpt.Pelt(model="rbf").fit(data)
+        return model.predict(pen=penalty)
+
+    def find_distributions(self, model, data:pd.Series):
+        flexation_points = self._find_flexation_points(data)
+        fitting_results = self._fit_mixed_models(data, flexation_points)
+
+        fitting_score = fitting_results['right_score'].iloc[0]
+        best_point = fitting_results.iloc[0]['point']
+
+        main_model_score = self._calc_main_model_wasser(model, data, best_point)
+
+        if main_model_score - fitting_score < 0:
+            return None
+        if main_model_score - fitting_score > 0:
+            left_set = data[data <= best_point]
+            right_set = data[data >= best_point]
+
+            left_model = distfit(stats="wasserstein")
+            right_model = distfit(stats="wasserstein")
+
+            left_model.fit_transform(left_set)
+            right_model.fit_transform(right_set)
+            return left_model, right_model, left_set, right_set
+
+
 class Laws:
 
     def __init__(self, pdf_object: FPDF, stats_frame: DataSetStats, output_path: str):
@@ -834,22 +986,19 @@ class Laws:
         buffer.seek(0)
         return buffer
 
-
-    def _plot_distribution(self, model, values, measure_type:str = 'Values'):
+    def _plot_distribution(self, model, values, measure_type: str = "Values"):
         buffer_plot_distribution = BytesIO()
         buffer_plot_model = BytesIO()
 
-        measure_type = measure_type.replace(
-            '_',' '
-            ).replace(
-                'distribution',''
-                ).capitalize()
+        measure_type = (
+            measure_type.replace("_", " ").replace("distribution", "").capitalize()
+        )
 
         sns.set_style("whitegrid")
         plt.figure(figsize=(12, 5))
         plt.hist(values, bins=100, density=True)
         plt.xlabel(measure_type)
-        plt.ylabel('Values')
+        plt.ylabel("Values")
         plt.loglog()
 
         plt.savefig(
@@ -862,21 +1011,12 @@ class Laws:
         plt.close()
         buffer_plot_distribution.seek(0)
 
-
         plt.figure(figsize=(12, 5))
         model.plot(
-            pdf_properties={
-                "color": "#472D30",
-                "linewidth": 4,
-                "linestyle": "--"
-                },
+            pdf_properties={"color": "#472D30", "linewidth": 4, "linestyle": "--"},
             bar_properties=None,
             cii_properties=None,
-            emp_properties={
-                "color": "#E26D5C",
-                "linewidth": 0,
-                "marker": "o"
-                },
+            emp_properties={"color": "#E26D5C", "linewidth": 0, "marker": "o"},
             figsize=(8, 5),
         )
         plt.xlabel(measure_type)
@@ -892,9 +1032,6 @@ class Laws:
         plt.close()
         buffer_plot_model.seek(0)
         return buffer_plot_distribution, buffer_plot_model
-
-
-
 
 
     def log_curve_fitting_resluts(func):
@@ -923,7 +1060,7 @@ class Laws:
     def log_distribution_fittin_results(func):
         # TODO:
         def wrapper(self, *args, **kwargs):
-            pass
+            results = func(self, *args, **kwargs)
 
         return wrapper
 
@@ -943,17 +1080,25 @@ class Laws:
 
         return wrapper
 
+    def flexation_point(self):
+        # TODO: fucktion to calcluate
+        pass
 
     def check_distribution_fit(func):
-        # TODO:
         def wrapper(self, *args, **kwarg):
             model, data = func(self, *args, **kwargs)
             if model.model["name"] not in const.DISTRIBUTIONS:
-                #TODO: distribution flexation points logic
-                pass
-            else:
+                # TODO: distribution flexation points logic
 
-                return model
+                buffer_plot_distribution, buffer_plot_model = self._plot_distribution(
+                    model, data, func.__name__
+                )
+                return model, buffer_plot_distribution, buffer_plot_model
+            else:
+                buffer_plot_distribution, buffer_plot_model = self._plot_distribution(
+                    model, data, func.__name__
+                )
+                return model, buffer_plot_distribution, buffer_plot_model
 
         return wrapper
 
@@ -1288,7 +1433,7 @@ class ScalingLawsCalc:
         laws.distinct_locations_over_time(filtered_animals, min_label_no)
         laws.jump_lengths_distribution(filtered_animals)
         laws.waiting_times(filtered_animals)
-        laws.msd_curve(filtered_animals,min_records)
+        laws.msd_curve(filtered_animals, min_records)
         laws.travel_times(filtered_animals)
         laws.rog(filtered_animals)
         laws.rog_over_time(filtered_animals)
