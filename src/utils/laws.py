@@ -492,7 +492,7 @@ class Stats:
             float: The mean period in days.
         """
 
-        return (data.groupby('user_id')["end"].max() - data.groupby('user_id')["start"].min()).mean()  # type: ignore
+        return (data.groupby("user_id")["end"].max() - data.groupby("user_id")["start"].min()).mean()  # type: ignore
 
     @staticmethod
     def get_min_periods(data: TrajectoriesFrame) -> pd.Timedelta:
@@ -506,7 +506,7 @@ class Stats:
         Returns:
             float: The minimum period in days.
         """
-        return (data.groupby('user_id')["end"].max() - data.groupby('user_id')["start"].min()).min()  # type: ignore
+        return (data.groupby("user_id")["end"].max() - data.groupby("user_id")["start"].min()).min()  # type: ignore
 
     @staticmethod
     def get_max_periods(data: TrajectoriesFrame) -> pd.Timedelta:
@@ -520,7 +520,7 @@ class Stats:
         Returns:
             float: The maximum period in days.
         """
-        return (data.groupby('user_id')["end"].max() - data.groupby('user_id')["start"].min()).max()  # type: ignore
+        return (data.groupby("user_id")["end"].max() - data.groupby("user_id")["start"].min()).max()  # type: ignore
 
     @staticmethod
     def get_overall_area(data: TrajectoriesFrame) -> float:
@@ -645,7 +645,6 @@ class DataSetStats:
         self.record = {}
 
 
-
 class Prepocessing:
 
     def __init__(self) -> None:
@@ -695,7 +694,7 @@ class Prepocessing:
         base_csr: int = const.ELLIPSOIDAL_CRS,
         target_crs: int = const.CARTESIAN_CRS,
     ) -> TrajectoriesFrame:
-        data_frame = data.copy().set_crs(base_csr) # type: ignore
+        data_frame = data.copy().set_crs(base_csr)  # type: ignore
 
         return data_frame.to_crs(target_crs)
 
@@ -835,6 +834,69 @@ class Laws:
         buffer.seek(0)
         return buffer
 
+
+    def _plot_distribution(self, model, values, measure_type:str = 'Values'):
+        buffer_plot_distribution = BytesIO()
+        buffer_plot_model = BytesIO()
+
+        measure_type = measure_type.replace(
+            '_',' '
+            ).replace(
+                'distribution',''
+                ).capitalize()
+
+        sns.set_style("whitegrid")
+        plt.figure(figsize=(12, 5))
+        plt.hist(values, bins=100, density=True)
+        plt.xlabel(measure_type)
+        plt.ylabel('Values')
+        plt.loglog()
+
+        plt.savefig(
+            os.path.join(
+                self.output_path,
+                f"{measure_type}_distribution.png",
+            )
+        )
+        plt.savefig(buffer_plot_distribution, format="png")
+        plt.close()
+        buffer_plot_distribution.seek(0)
+
+
+        plt.figure(figsize=(12, 5))
+        model.plot(
+            pdf_properties={
+                "color": "#472D30",
+                "linewidth": 4,
+                "linestyle": "--"
+                },
+            bar_properties=None,
+            cii_properties=None,
+            emp_properties={
+                "color": "#E26D5C",
+                "linewidth": 0,
+                "marker": "o"
+                },
+            figsize=(8, 5),
+        )
+        plt.xlabel(measure_type)
+        plt.loglog()
+
+        plt.savefig(
+            os.path.join(
+                self.output_path,
+                f"{measure_type}_model_distribution.png",
+            )
+        )
+        plt.savefig(buffer_plot_model, format="png")
+        plt.close()
+        buffer_plot_model.seek(0)
+        return buffer_plot_distribution, buffer_plot_model
+
+
+
+
+
     def log_curve_fitting_resluts(func):
         def wrapper(self, *args, **kwargs):
             func_name, best_fit, param_frame, plot_obj = func(self, *args, **kwargs)
@@ -858,6 +920,13 @@ class Laws:
 
         return wrapper
 
+    def log_distribution_fittin_results(func):
+        # TODO:
+        def wrapper(self, *args, **kwargs):
+            pass
+
+        return wrapper
+
     def check_curve_fit(func):
         def wrapper(self, *args, **kwargs):
             best_fit, param_frame, y_pred, exp_y_pred, plot_data, labels = func(
@@ -874,9 +943,25 @@ class Laws:
 
         return wrapper
 
+
+    def check_distribution_fit(func):
+        # TODO:
+        def wrapper(self, *args, **kwarg):
+            model, data = func(self, *args, **kwargs)
+            if model.model["name"] not in const.DISTRIBUTIONS:
+                #TODO: distribution flexation points logic
+                pass
+            else:
+
+                return model
+
+        return wrapper
+
     @log_curve_fitting_resluts
     @check_curve_fit
-    def visitation_frequency(self, data: TrajectoriesFrame, min_labels_no: int):
+    def visitation_frequency(
+        self, data: TrajectoriesFrame, min_labels_no: int
+    ) -> tuple:
         vf = visitation_frequency(data)
         avg_vf = rowwise_average(vf, row_count=min_labels_no)
         avg_vf.index += 1
@@ -891,7 +976,9 @@ class Laws:
 
     @log_curve_fitting_resluts
     @check_curve_fit
-    def distinct_locations_over_time(self, data: TrajectoriesFrame, min_labels_no: int):
+    def distinct_locations_over_time(
+        self, data: TrajectoriesFrame, min_labels_no: int
+    ) -> tuple:
 
         dlot = distinct_locations_over_time(data)
         avg_dlot = rowwise_average(dlot, row_count=min_labels_no)
@@ -905,7 +992,7 @@ class Laws:
 
         return best_fit, global_params, y_pred, expon_y_pred, avg_dlot, ["S(t)", "t"]
 
-    def jump_lengths_distribution(self, data: TrajectoriesFrame):
+    def jump_lengths_distribution(self, data: TrajectoriesFrame) -> tuple:
         jl = jump_lengths(data)
         jl = jl[jl != 0]
         jl_dist = convert_to_distribution(jl, num_of_classes=20)
@@ -915,7 +1002,9 @@ class Laws:
         model = distfit(stats="wasserstein")
         model.fit_transform(jl.values)
 
-    def waiting_times(self, data: TrajectoriesFrame):
+        return model, jl
+
+    def waiting_times(self, data: TrajectoriesFrame) -> tuple:
         data_set = data.copy()
         try:
             wt = data_set.groupby(level=0).apply(
@@ -931,7 +1020,9 @@ class Laws:
         model = distfit(stats="wasserstein")
         model.fit_transform(wt.values)
 
-    def travel_times(self, data: TrajectoriesFrame):
+        return model, wt
+
+    def travel_times(self, data: TrajectoriesFrame) -> tuple:
         data_set = data.copy()
         try:
             tt = (
@@ -951,16 +1042,20 @@ class Laws:
         model = distfit(stats="wasserstein")
         model.fit_transform(tt.values)
 
-    def rog(self, data: TrajectoriesFrame):
+        return model, tt
+
+    def rog(self, data: TrajectoriesFrame) -> tuple:
         rog = radius_of_gyration(data, time_evolution=False)
 
         # Fit to find the best theoretical distribution
         model = distfit(stats="RSS")
         model.fit_transform(rog.values)
 
+        return model, rog
+
     @log_curve_fitting_resluts
     @check_curve_fit
-    def rog_over_time(self, data: TrajectoriesFrame):
+    def rog_over_time(self, data: TrajectoriesFrame) -> tuple:
         rog = radius_of_gyration(data, time_evolution=True)
         avg_rog = rowwise_average(rog)
         avg_rog = avg_rog[~avg_rog.isna()]
@@ -979,16 +1074,18 @@ class Laws:
             ["Time", "Values"],
         )
 
-    def msd_distribution(self, data: TrajectoriesFrame):
+    def msd_distribution(self, data: TrajectoriesFrame) -> tuple:
         msd = mean_square_displacement(data, time_evolution=False, from_center=True)
 
         # Fit to find the best theoretical distribution
         model = distfit(stats="wasserstein")
         model.fit_transform(msd.values)
 
+        return model, msd
+
     @log_curve_fitting_resluts
     @check_curve_fit
-    def msd_curve(self, data: TrajectoriesFrame, min_records_no: int):
+    def msd_curve(self, data: TrajectoriesFrame, min_records_no: int) -> tuple:
         msd = mean_square_displacement(data, time_evolution=True, from_center=False)
         avg_msd = rowwise_average(msd, row_count=min_records_no)
         avg_msd = avg_msd[~avg_msd.isna()]
@@ -999,7 +1096,7 @@ class Laws:
 
         return best_fit, global_params, y_pred, expon_y_pred, avg_msd, ["MSD", "t"]
 
-    def return_time_distribution(self, data: TrajectoriesFrame):
+    def return_time_distribution(self, data: TrajectoriesFrame) -> tuple:
         to_concat = {}
         data_set = data.copy()
         for uid, vals in tqdm(
@@ -1034,7 +1131,9 @@ class Laws:
         model = distfit(stats="wasserstein")
         model.fit_transform(rt.values)
 
-    def exploration_time(self, data: TrajectoriesFrame):
+        return model, rt
+
+    def exploration_time(self, data: TrajectoriesFrame) -> tuple:
         to_concat = {}
         data_set = data.copy()
         for uid, vals in tqdm(
@@ -1068,6 +1167,8 @@ class Laws:
         # Fit to find the best theoretical distribution
         model = distfit(stats="wasserstein")
         model.fit_transform(et.values)
+
+        return model, et
 
 
 class ScalingLawsCalc:
@@ -1117,25 +1218,25 @@ class ScalingLawsCalc:
 
         self.stats_frame.add_data(
             {
-                'min_label_no': [
-                    [f'user_id : {index}', f'no: {value}']
-                    for index, value in
-                    stats.get_min_labels_no_after_filtration(
+                "min_label_no": [
+                    [f"user_id : {index}", f"no: {value}"]
+                    for index, value in stats.get_min_labels_no_after_filtration(
                         filtered_animals
                     ).items()
                 ]
             }
         )
 
-        self.stats_frame.add_data({
-            'min_records': [
-                [f'user_id : {index}', f'no: {value}']
-                for index, value in
-                stats.get_min_records_no_before_filtration(
-                    self.data
-                ).items()
-            ]
-        })
+        self.stats_frame.add_data(
+            {
+                "min_records": [
+                    [f"user_id : {index}", f"no: {value}"]
+                    for index, value in stats.get_min_records_no_before_filtration(
+                        self.data
+                    ).items()
+                ]
+            }
+        )
 
         self.stats_frame.add_data(
             {"avg_duration": stats.get_mean_periods(filtered_animals)}
@@ -1165,20 +1266,18 @@ class ScalingLawsCalc:
         compressed_points, filtered_animals = self._preprocess_data()
 
         min_label_no = [
-                    [value]
-                    for index, value in
-                    Stats().get_min_labels_no_after_filtration(
-                        filtered_animals
-                    ).items()
-                ][0][0]
+            [value]
+            for index, value in Stats()
+            .get_min_labels_no_after_filtration(filtered_animals)
+            .items()
+        ][0][0]
 
         min_records = [
-                [value]
-                for index, value in
-                Stats().get_min_records_no_before_filtration(
-                    self.data
-                ).items()
-            ][0][0]
+            [value]
+            for index, value in Stats()
+            .get_min_records_no_before_filtration(self.data)
+            .items()
+        ][0][0]
 
         laws = Laws(
             pdf_object=self.pdf,
@@ -1187,8 +1286,16 @@ class ScalingLawsCalc:
         )
         laws.visitation_frequency(filtered_animals, min_label_no)
         laws.distinct_locations_over_time(filtered_animals, min_label_no)
+        laws.jump_lengths_distribution(filtered_animals)
+        laws.waiting_times(filtered_animals)
+        laws.msd_curve(filtered_animals,min_records)
+        laws.travel_times(filtered_animals)
+        laws.rog(filtered_animals)
         laws.rog_over_time(filtered_animals)
+        laws.msd_distribution(filtered_animals)
         laws.msd_curve(filtered_animals, min_records)
+        laws.return_time_distribution(filtered_animals)
+        laws.exploration_time(filtered_animals)
 
         pdf_path = os.path.join(self.output_dir_animal, f"{self.animal_name}.pdf")
         self.pdf.output(pdf_path)
