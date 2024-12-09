@@ -30,3 +30,7 @@ BEST_POINT_NO = 5 # Take top 5 points with minimal changes and look for maximum 
 MIN_LABEL_NO = 3
 QUARTILE = 0.25
 MIN_QUARTILE_VALUE = 3
+
+CURVE = {'linear','expon','expon_neg'}
+DISTRIBUTIONS = {'longnorm','expon','pareto','norm'}
+FLEXATION_POINTS_SENSITIVITY = 'Medium'
