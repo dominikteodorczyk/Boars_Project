@@ -755,7 +755,7 @@ class Flexation:
             return 1.5 * log(len(data))
 
     def _calc_main_model_wasser(
-        self, model_obj: distfit, data: pd.Series, flexation_point: int
+        self, model_obj: distfit, data: ndarray, flexation_point: int
     ) -> float:
 
         left_set = data[data <= flexation_point]
@@ -783,7 +783,7 @@ class Flexation:
         return wasserstein_distance(empiric_density, model_density)
 
     def _fit_mixed_models(
-        self, data: pd.Series, flexation_points: list
+        self, data: ndarray, flexation_points: list
     ) -> pd.DataFrame:
         fitting_results = pd.DataFrame(
             columns=[
@@ -802,7 +802,7 @@ class Flexation:
             left_set = data[data <= point]
             right_set = data[data >= point]
 
-            if left_set.size >= 5 and right_set.size >= 5:
+            if left_set.size >= 1 and right_set.size >= 3:#FIXME:
                 left_model = distfit(stats="wasserstein")
                 right_model = distfit(stats="wasserstein")
 
@@ -862,32 +862,36 @@ class Flexation:
                 pass
         return fitting_results.sort_values("right_score", ascending=True)
 
-    def _find_flexation_points(self, data: pd.Series) -> list:
+    def _find_flexation_points(self, data: ndarray) -> list:
         penalty = self._calculate_penalty(data)
         model = rpt.Pelt(model="rbf").fit(data)
-        return model.predict(pen=penalty)
+        break_points_indx = model.predict(pen=penalty)
+        return [data[i-1] for i in break_points_indx]
 
-    def find_distributions(self, model, data: pd.Series):
+
+    def find_distributions(self, model:distfit, data: ndarray):
         flexation_points = self._find_flexation_points(data)
         fitting_results = self._fit_mixed_models(data, flexation_points)
-
-        fitting_score = fitting_results["right_score"].iloc[0]
-        best_point = fitting_results.iloc[0]["point"]
-
-        main_model_score = self._calc_main_model_wasser(model, data, best_point)
-
-        if main_model_score - fitting_score < 0:
+        if fitting_results.shape[0] == 0:
             return None
-        if main_model_score - fitting_score > 0:
-            left_set = data[data <= best_point]
-            right_set = data[data >= best_point]
+        else:
+            fitting_score = fitting_results["right_score"].iloc[0]
+            best_point = fitting_results.iloc[0]["point"]
 
-            left_model = distfit(stats="wasserstein")
-            right_model = distfit(stats="wasserstein")
+            main_model_score = self._calc_main_model_wasser(model, data, best_point)
 
-            left_model.fit_transform(left_set)
-            right_model.fit_transform(right_set)
-            return left_model, right_model, left_set, right_set
+            if main_model_score - fitting_score < 0:
+                return None
+            if main_model_score - fitting_score > 0:
+                left_set = data[data <= best_point]
+                right_set = data[data >= best_point]
+
+                left_model = distfit(stats="wasserstein")
+                right_model = distfit(stats="wasserstein")
+
+                left_model.fit_transform(left_set)
+                right_model.fit_transform(right_set)
+                return left_model, right_model, left_set, right_set
 
 
 class Laws:
@@ -1134,12 +1138,12 @@ class Laws:
 
         return wrapper
 
-    def log_distribution_fittin_results(func):
-        # TODO:
+    def log_distribution_fitting_resluts(func):
         def wrapper(self, *args, **kwargs):
             results = func(self, *args, **kwargs)
 
         return wrapper
+
 
     def check_curve_fit(func):
         def wrapper(self, *args, **kwargs):
@@ -1158,29 +1162,27 @@ class Laws:
         return wrapper
 
     def check_distribution_fit(func):
-        def wrapper(self, *args, **kwarg):
+        def wrapper(self, *args, **kwargs):
             model, data = func(self, *args, **kwargs)
-            if model.model["name"] not in const.DISTRIBUTIONS:
-                buffer_plot_distribution, buffer_plot_model = self._plot_distribution(
-                    model, data, func.__name__
-                )
+
+            plot_distribution_obj, plot_model_obj = self._plot_distribution(
+                model, data, func.__name__
+            )
+            if model.model["name"] not in const.DISTRIBUTIONS and data.shape[0]>=4:#FIXME:
                 flexation_point_detection_results = Flexation().find_distributions(
-                    model, data.values
+                    model, np.sort(data.values)
                 )
-                if len(flexation_point_detection_results) == 6:
+                if flexation_point_detection_results != None:
                     return (
                         model,
-                        buffer_plot_distribution,
-                        buffer_plot_model,
+                        plot_distribution_obj,
+                        plot_model_obj,
                         flexation_point_detection_results,
                     )
                 else:
-                    return model, buffer_plot_distribution, buffer_plot_model
+                    return model, plot_distribution_obj, plot_model_obj
             else:
-                buffer_plot_distribution, buffer_plot_model = self._plot_distribution(
-                    model, data, func.__name__
-                )
-                return model, buffer_plot_distribution, buffer_plot_model
+                return model, plot_distribution_obj, plot_model_obj
 
         return wrapper
 
@@ -1219,6 +1221,8 @@ class Laws:
 
         return best_fit, global_params, y_pred, expon_y_pred, avg_dlot, ["S(t)", "t"]
 
+    @log_distribution_fitting_resluts
+    @check_distribution_fit
     def jump_lengths_distribution(self, data: TrajectoriesFrame) -> tuple:
         jl = jump_lengths(data)
         jl = jl[jl != 0]
@@ -1231,6 +1235,8 @@ class Laws:
 
         return model, jl
 
+    @log_distribution_fitting_resluts
+    @check_distribution_fit
     def waiting_times(self, data: TrajectoriesFrame) -> tuple:
         data_set = data.copy()
         try:
@@ -1249,6 +1255,8 @@ class Laws:
 
         return model, wt
 
+    @log_distribution_fitting_resluts
+    @check_distribution_fit
     def travel_times(self, data: TrajectoriesFrame) -> tuple:
         data_set = data.copy()
         try:
@@ -1271,6 +1279,8 @@ class Laws:
 
         return model, tt
 
+    @log_distribution_fitting_resluts
+    @check_distribution_fit
     def rog(self, data: TrajectoriesFrame) -> tuple:
         rog = radius_of_gyration(data, time_evolution=False)
 
@@ -1301,6 +1311,8 @@ class Laws:
             ["Time", "Values"],
         )
 
+    @log_distribution_fitting_resluts
+    @check_distribution_fit
     def msd_distribution(self, data: TrajectoriesFrame) -> tuple:
         msd = mean_square_displacement(data, time_evolution=False, from_center=True)
 
@@ -1323,6 +1335,8 @@ class Laws:
 
         return best_fit, global_params, y_pred, expon_y_pred, avg_msd, ["MSD", "t"]
 
+    @log_distribution_fitting_resluts
+    @check_distribution_fit
     def return_time_distribution(self, data: TrajectoriesFrame) -> tuple:
         to_concat = {}
         data_set = data.copy()
@@ -1360,6 +1374,8 @@ class Laws:
 
         return model, rt
 
+    @log_distribution_fitting_resluts
+    @check_distribution_fit
     def exploration_time(self, data: TrajectoriesFrame) -> tuple:
         to_concat = {}
         data_set = data.copy()
