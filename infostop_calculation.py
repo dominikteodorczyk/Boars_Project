@@ -30,53 +30,22 @@ python process_data.py
 
 import os
 import traceback
-from src.utils.dataIO import DataPrepocessing
+import logging
+from src.utils.dataIO import (
+    DataPrepocessing,
+    DataIO,
+    get_file_paths,
+    create_output_directory
+)
 from src.utils.istop import InfoStopData
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 # Define the directory containing parsed data files
 PARSED_DATA_DIR = ''
-OUTPUT_DIR_NAME = ''
-
-
-def get_file_paths(directory:str) -> list:
-    """
-    Retrieves a list of file paths from a given directory.
-
-    Args:
-        directory (str): The path to the directory containing the files.
-
-    Returns:
-        list: A list of full file paths to all files in the directory.
-    """
-    return [
-        os.path.join(directory, file)
-        for file in os.listdir(directory)
-        if os.path.isfile(os.path.join(directory, file))
-    ]
-
-
-def create_output_directory(base_path:str, dir_name: str) -> str:
-    """
-    Creates an output directory if it does not already exist.
-
-    Args:
-        base_path (str): The base path where the directory should be created.
-        dir_name (str): The name of the output directory.
-
-    Returns:
-        str: The full path to the created directory.
-
-    Raises:
-        OSError: If the directory cannot be created due to system errors.
-    """
-    output_path = os.path.join(base_path, dir_name)
-    if not os.path.exists(output_path):
-        try:
-            os.mkdir(output_path)
-        except OSError as e:
-            raise OSError(f"Failed to create output "
-                          f"directory at {output_path}: {e}")
-    return output_path
+OUTPUT_DIR_NAME = 'infostop_output'
 
 
 def process_file(parsed_file:str, output_dir:str):
@@ -94,8 +63,8 @@ def process_file(parsed_file:str, output_dir:str):
     """
     try:
         # Prepare data for processing
-        data = DataPrepocessing(parsed_file)
-        clean_data, data_name = data.infostop_data_prepare()
+        clean_data = DataIO.open_for_infostop(parsed_file)
+        data_name = DataIO.get_animal_name(parsed_file)
 
         # Create and process an InfoStopData object
         infostop_object = InfoStopData(
@@ -106,7 +75,7 @@ def process_file(parsed_file:str, output_dir:str):
         infostop_object.calculate_all()
 
     except Exception as e:
-        print(f"Error processing file {parsed_file}: {e}")
+        logging.error(f"Error processing file {parsed_file}: {e}")
         traceback.print_exc()
 
 
@@ -132,11 +101,13 @@ def main():
 
         # Process each parsed file
         for parsed_file in file_paths:
-            print(f"Processing file: {parsed_file}")
+            logging.info(f"Processing file: {parsed_file}")
             process_file(parsed_file, output_dir)
 
     except Exception as e:
-        print(f"An unexpected error occurred in the main workflow: {e}")
+        logging.error(
+            f"An unexpected error occurred in the main workflow: {e}"
+        )
         traceback.print_exc()
 
 

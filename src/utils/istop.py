@@ -31,6 +31,7 @@ from humobi.tools.user_statistics import (
     user_trajectories_duration,
     consecutive_record,
 )
+from constans import const
 
 import matplotlib
 
@@ -45,6 +46,11 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message="Pandas doesn't allow columns to be created via a new attribute name"
+    )
 
 class DataAnalystInfostop:
     """
@@ -464,8 +470,8 @@ class DataFilter:
                 the time window.
         """
         self.pdf_object = pdf_object
-        self.allowed_minutes = [1, 5, 10, 15, 20, 30, 60]
-        self.day_window = 21
+        self.allowed_minutes = const.ALLOWED_MINUTES
+        self.day_window = const.DAYS_WINDOW
 
     def _add_pdf_cell(self, txt_to_add: str) -> None:
         """
@@ -555,7 +561,7 @@ class DataFilter:
                 selected = cur_df[
                     (cur_df["datetime"] <= max_date) &
                     (cur_df["datetime"] >= min_date)
-                ]
+                ].copy()
                 selected["user_id"] = an_id
                 selected = selected.set_index(["user_id", "datetime"])
                 extracted.append(selected)
@@ -664,15 +670,15 @@ class DataFilter:
             temp_res_animal_ex = temporal_df.groupby(level=0).median()
 
             # Fraction of missing records < 0.6
-            frac_filter = fraction_of_empty_records(data, "1H")
-            level1 = set(frac_filter[frac_filter < 0.6].index)
+            frac_filter = fraction_of_empty_records(data, const.RESOLUTION_OF_FRACTION_OF_MISSING_VALUES)
+            level1 = set(frac_filter[frac_filter < const.FRACTION_OF_MISSING_VALUES].index)
 
             # More than 20 days of data
-            traj_dur_filter = user_trajectories_duration(data, "1D")
-            level2 = set(traj_dur_filter[traj_dur_filter > 20].index)
+            traj_dur_filter = user_trajectories_duration(data, const.RESOLUTION_OF_USER_TRAJECTORIES_DURATION)
+            level2 = set(traj_dur_filter[traj_dur_filter > const.USER_TRAJECTORIES_DURATION].index)
 
             level3 = set(
-                temp_res_animal_ex[temp_res_animal_ex <= "30min"].index
+                temp_res_animal_ex[temp_res_animal_ex <= const.TEMPORAL_RESOLUTION_EXTRACTION].index
             )
 
             # User filtration with ULOC method
@@ -706,7 +712,7 @@ class DataFilter:
         """
         try:
             data_sorted = data.sort_index(level=[0, 1])
-            data_sorted = data_sorted.to_crs(dest_crs=4326, cur_crs=3857)  # type: ignore
+            data_sorted = data_sorted.to_crs(dest_crs=const.ELLIPSOIDAL_CRS, cur_crs=const.CARTESIAN_CRS)  # type: ignore
             df1 = data_sorted.reset_index()
             data_prepared = df1.reset_index(drop=True)[
                 ["user_id", "datetime", "lon", "lat"]
@@ -798,7 +804,7 @@ class LabelsCalc:
             raise RuntimeError(f"Failed to add plot to PDF: {e}")
 
     def _compute_intervals(
-        self, labels: list, times: np.ndarray, max_time_between: int = 86400
+        self, labels: list, times: np.ndarray, max_time_between: int = const.MAX_TIME_BETWEEN
     ) -> list:
         """
         Compute stop and move intervals based on labels and timestamps.
@@ -859,7 +865,7 @@ class LabelsCalc:
                 r2=r2,
                 label_singleton=False,
                 min_staying_time=min_staying_time,
-                max_time_between=86400,
+                max_time_between=const.MAX_TIME_BETWEEN,
                 min_size=2,
             )
 
@@ -964,7 +970,7 @@ class LabelsCalc:
                             r2=r2,
                             label_singleton=False,
                             min_staying_time=min_staying_time,
-                            max_time_between=86400,
+                            max_time_between=const.MAX_TIME_BETWEEN,
                             min_size=2,
                         )
                         try:
@@ -1049,7 +1055,7 @@ class LabelsCalc:
         buffer.seek(0)
         return buffer
 
-    def _choose_param_value(self, data: pd.DataFrame, param: str) -> int:
+    def _choose_param_value(self, data: pd.DataFrame, param: str) -> float:
         """
         Choose the optimal value for a given parameter based on
         the sensitivity matrix.
@@ -1067,15 +1073,15 @@ class LabelsCalc:
 
         Returns
         -------
-        int
+        float
             The selected optimal parameter value based on
             the stabilization point.
         """
 
         if param == "R1":
-            data = data[(data["R1"] >= 50) & (data["R1"] <= 1000)]
+            data = data[(data["R1"] >= const.R1_MIN) & (data["R1"] <= const.R1_MAX)]
         if param == "Tmin":
-            data = data[(data["Tmin"] >= 600) & (data["Tmin"] <= 3600)]
+            data = data[(data["Tmin"] >= const.TMIN_MIN) & (data["Tmin"] <= const.TMIN_MAX)]
 
         result_med = data.groupby(["animal_id", param]).median()
         result_med_agg = result_med.groupby(
@@ -1092,10 +1098,10 @@ class LabelsCalc:
             {"de_value": np.abs(dy_dx)}
         ).sort_values(by="de_value")
 
-        stabilization_x = x[dxdy.index[:5]]
+        stabilization_x = x[dxdy.index[:const.BEST_POINT_NO]]
         filtred = data[data[param].isin(stabilization_x)]
         suma_total_stops = filtred.groupby(param)["Total_stops"].sum()
-        stabilization_point_index = int(suma_total_stops.idxmax())
+        stabilization_point_index = float(suma_total_stops.idxmax())
 
         plot_obj = self._plot_param(
             param, stabilization_point_index, x, y, dy_dx  # type: ignore
@@ -1148,7 +1154,7 @@ class LabelsCalc:
                 r2=r2,
                 label_singleton=False,
                 min_staying_time=Tmin,
-                max_time_between=86400,
+                max_time_between=const.MAX_TIME_BETWEEN,
                 min_size=2,
             )
             labels = model.fit_predict(data)
@@ -1280,21 +1286,26 @@ class InfoStopData:
 
             # Step 3: Filter the data
             filtred_data = filter.filter_data(data=extracted_data)
-            raport.generate_raport(data=filtred_data, data_analyst_no=3)
 
-            # Step 4: Sort the data
-            sorted_data = filter.sort_data(filtred_data)
+            if len(filtred_data) !=0:
+                raport.generate_raport(data=filtred_data, data_analyst_no=3)
 
-            # Step 5: Process data with the infostop module
-            trajectory_processed_data = labels_calculator.calculate_infostop(
-                sorted_data
-            )
+                # Step 4: Sort the data
+                sorted_data = filter.sort_data(filtred_data)
 
-            # Save results to CSV
-            csv_path = os.path.join(
-                self.output_dir, f"Trajectory_processed_{self.animal_name}.csv"
-            )
-            trajectory_processed_data.to_csv(csv_path)
+                # Step 5: Process data with the infostop module
+                trajectory_processed_data = labels_calculator.calculate_infostop(
+                    sorted_data
+                )
+
+                # Save results to CSV
+                csv_path = os.path.join(
+                    self.output_dir,
+                    f"Trajectory_processed_{self.animal_name}.csv"
+                )
+                trajectory_processed_data.to_csv(csv_path)
+            else:
+                logging.warning('No animals after filtration')
 
             # Save report to PDF
             pdf_path = os.path.join(
