@@ -32,5 +32,5 @@ QUARTILE = 0.25
 MIN_QUARTILE_VALUE = 3
 
 CURVE = {'linear','expon','expon_neg'}
-DISTRIBUTIONS = {'longnorm','expon','pareto','norm'}
+DISTRIBUTIONS = {'lognorm','expon','pareto','norm'}
 FLEXATION_POINTS_SENSITIVITY = 'Medium'
