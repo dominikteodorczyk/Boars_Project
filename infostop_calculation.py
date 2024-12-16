@@ -32,7 +32,6 @@ import os
 import traceback
 import logging
 from src.utils.dataIO import (
-    DataPrepocessing,
     DataIO,
     get_file_paths,
     create_output_directory
@@ -44,7 +43,7 @@ logging.basicConfig(
 )
 
 # Define the directory containing parsed data files
-PARSED_DATA_DIR = ''
+PARSED_DATA_DIR = '/home/dteodorczyk/Desktop/boars_repo/Boars_Project/test_data/1_PARSED'
 OUTPUT_DIR_NAME = 'infostop_output'
 
 
