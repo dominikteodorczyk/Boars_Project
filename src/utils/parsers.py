@@ -112,6 +112,25 @@ def data_structuring(dataframe:pd.DataFrame) -> pd.DataFrame:
         logging.error(f'Data structuring error: {e}')
 
 
+def filter_by_month_range(data, start, end, in_out=True):
+    data['datetime'] = pd.to_datetime(data['datetime'], errors='coerce')
+    months = data['datetime'].dt.month
+
+    if start <= end:
+        condition = months.between(start, end)
+    else:
+        condition = (months >= start) | (months <= end)
+
+    if in_out:
+        result = data[condition]
+    else:
+        result = data[~condition]
+
+    # result['datetime'] = result['datetime'].apply(lambda x: int(x.timestamp()))
+
+    return result
+
+
 def data_write(dataframe:pd.DataFrame, filename:str, output_path:str=None):
     """
     Writes the processed DataFrame to a CSV file.
@@ -147,7 +166,8 @@ def data_write(dataframe:pd.DataFrame, filename:str, output_path:str=None):
 def raw_data_parser(
         input_path:str,
         cols:list,
-        output_path:str = None
+        output_path:str = None,
+        breeding_periods:list = None
 ) -> None:
     """
     Parses and processes raw data from a CSV file.
@@ -179,12 +199,35 @@ def raw_data_parser(
         id_parsed = parse_id(dataframe=raw_data, cols=cols)
         time_parsed = parse_time(dataframe=id_parsed, cols=cols)
         data_structured = data_structuring(time_parsed)
-
-        data_write(
-            dataframe=data_structured,
-            filename=file_name,
-            output_path=output_path
+        if not breeding_periods:
+            data_write(
+                dataframe=data_structured,
+                filename=file_name,
+                output_path=output_path
+                )
+        elif len(breeding_periods) == 2:
+            in_breeding_periods = filter_by_month_range(
+                data_structured,
+                breeding_periods[0],
+                breeding_periods[1],
+                True
             )
+            out_breeding_periods = filter_by_month_range(
+                data_structured,
+                breeding_periods[0],
+                breeding_periods[1],
+                False
+            )
+            data_write(
+                dataframe=in_breeding_periods,
+                filename=f'in_breeding_{file_name}',
+                output_path=output_path
+                )
+            data_write(
+                dataframe=out_breeding_periods,
+                filename=f'out_breeding_{file_name}',
+                output_path=output_path
+                )
 
         logging.info(
             f'{file_name} parsed successfully. '
@@ -197,6 +240,7 @@ def raw_data_parser(
 
 def multi_raw_data_parser(
         data_dict:dict,
+        periods_dict:dict,
         output_path:str = None
 ) -> None:
     """
@@ -218,16 +262,20 @@ def multi_raw_data_parser(
             files. If None, saves in the current directory.
     """
     for key, value in data_dict.items():
+        breeding_periods = periods_dict[os.path.basename(key)]
+        print(breeding_periods)
         raw_data_parser(
             input_path=key,
             cols=value,
-            output_path=output_path
+            output_path=output_path,
+            breeding_periods = breeding_periods
             )
     logging.info(f'Multiparsing done.')
 
 
 def parse_data(
         json_source:str = None,
+        periods:str = None,
         path:str = None,
         cols:str = None,
         output_path:str = None
@@ -267,15 +315,19 @@ def parse_data(
             output_path='data/processed'
         )
     """
-    if json_source:
+    if json_source and periods:
         data_dict = json.load(open(json_source))
+        periods_dict = json.load(open(periods))
+
         multi_raw_data_parser(
             data_dict=data_dict,
+            periods_dict=periods_dict,
             output_path=output_path
             )
     elif not json_source:
         if type(path) == str and type(cols) == list:
             try:
+                #TODO: add breeding periods options to single csv parsing
                 raw_data_parser(
                     input_path=path,
                     cols=cols,
