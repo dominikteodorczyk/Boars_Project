@@ -6,8 +6,6 @@ import logging
 from humobi.structures.trajectory import TrajectoriesFrame
 import scipy
 import scipy.stats
-from src.measures.measures import Measures
-from src.measures.stats import AnimalStatistics
 from fpdf import FPDF
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -989,7 +987,7 @@ class Laws:
         plt.loglog()
         plt.xlabel(labels[0])
         plt.ylabel(labels[1])
-
+        plt.loglog()
         plt.savefig(
             os.path.join(
                 self.output_path,
