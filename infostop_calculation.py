@@ -31,12 +31,12 @@ python process_data.py
 import os
 import traceback
 import logging
-from src.utils.dataIO import (
+from src.dataIO import (
     DataIO,
     get_file_paths,
     create_output_directory
 )
-from src.utils.istop import InfoStopData
+from src.istop import InfoStopData
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"

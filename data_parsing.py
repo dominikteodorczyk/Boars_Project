@@ -33,7 +33,7 @@ Usage:
 
 import json
 import os
-from src.utils.parsers import parse_data
+from src.parsers import parse_data
 
 
 JSON_CONFIG_FILE = ''  # Put the path to the JSON configuration file here
