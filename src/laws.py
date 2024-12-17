@@ -6,8 +6,6 @@ import logging
 from humobi.structures.trajectory import TrajectoriesFrame
 import scipy
 import scipy.stats
-from src.measures.measures import Measures
-from src.measures.stats import AnimalStatistics
 from fpdf import FPDF
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -782,9 +780,7 @@ class Flexation:
 
         return wasserstein_distance(empiric_density, model_density)
 
-    def _fit_mixed_models(
-        self, data: ndarray, flexation_points: list
-    ) -> pd.DataFrame:
+    def _fit_mixed_models(self, data: ndarray, flexation_points: list) -> pd.DataFrame:
         fitting_results = pd.DataFrame(
             columns=[
                 "point",
@@ -802,7 +798,7 @@ class Flexation:
             left_set = data[data <= point]
             right_set = data[data >= point]
 
-            if left_set.size >= 1 and right_set.size >= 3:#FIXME:
+            if left_set.size >= 1 and right_set.size >= 3:  # FIXME:
                 left_model = distfit(stats="wasserstein")
                 right_model = distfit(stats="wasserstein")
 
@@ -866,10 +862,9 @@ class Flexation:
         penalty = self._calculate_penalty(data)
         model = rpt.Pelt(model="rbf").fit(data)
         break_points_indx = model.predict(pen=penalty)
-        return [data[i-1] for i in break_points_indx]
+        return [data[i - 1] for i in break_points_indx]
 
-
-    def find_distributions(self, model:distfit, data: ndarray):
+    def find_distributions(self, model: distfit, data: ndarray):
         flexation_points = self._find_flexation_points(data)
         fitting_results = self._fit_mixed_models(data, flexation_points)
         if fitting_results.shape[0] == 0:
@@ -891,7 +886,7 @@ class Flexation:
 
                 left_model.fit_transform(left_set)
                 right_model.fit_transform(right_set)
-                return left_model, right_model, left_set, right_set
+                return left_model, right_model, left_set, right_set, best_point
 
 
 class Laws:
@@ -944,20 +939,34 @@ class Laws:
         except Exception as e:
             raise RuntimeError(f"Failed to add plot to PDF: {e}")
 
-    def _add_pdf_table(self, data):
+    def _add_pdf_curves_table(self, data):
         self.pdf_object.ln(10)  # Nowa linia
-        self.pdf_object.cell(40, 10, "Curve", border=1, align="C")
-        self.pdf_object.cell(40, 10, "Weight", border=1, align="C")
-        self.pdf_object.cell(40, 10, "Param1", border=1, align="C")
-        self.pdf_object.cell(40, 10, "Param2", border=1, align="C")
+        self.pdf_object.cell(40, 5, "Curve", border=1, align="C")
+        self.pdf_object.cell(40, 5, "Weight", border=1, align="C")
+        self.pdf_object.cell(40, 5, "Param1", border=1, align="C")
+        self.pdf_object.cell(40, 5, "Param2", border=1, align="C")
         self.pdf_object.ln()
 
         for index, row in data.iterrows():
-            self.pdf_object.cell(40, 10, row["curve"], border=1, align="C")
-            self.pdf_object.cell(40, 10, str(row["weight"]), border=1, align="C")
-            self.pdf_object.cell(40, 10, str(row["param1"]), border=1, align="C")
-            self.pdf_object.cell(40, 10, str(row["param2"]), border=1, align="C")
+            self.pdf_object.cell(40, 5, row["curve"], border=1, align="C")
+            self.pdf_object.cell(40, 5, str(row["weight"]), border=1, align="C")
+            self.pdf_object.cell(40, 5, str(row["param1"]), border=1, align="C")
+            self.pdf_object.cell(40, 5, str(row["param2"]), border=1, align="C")
             self.pdf_object.ln()
+
+    def _add_pdf_distribution_table(self, data):
+        self.pdf_object.ln(10)  # Nowa linia
+        self.pdf_object.cell(40, 5, "Distribution", border=1, align="C")
+        self.pdf_object.cell(40, 5, "Score", border=1, align="C")
+        self.pdf_object.ln()
+
+        for index, row in data.iterrows():
+            try:
+                self.pdf_object.cell(40, 5, row["name"], border=1, align="C")
+                self.pdf_object.cell(40, 5, str(row["score"]), border=1, align="C")
+                self.pdf_object.ln()
+            except:
+                pass
 
     def _plot_curve(self, func_name, plot_data, y_pred, labels, exp_y_pred=None):
         buffer = BytesIO()
@@ -978,7 +987,7 @@ class Laws:
         plt.loglog()
         plt.xlabel(labels[0])
         plt.ylabel(labels[1])
-
+        plt.loglog()
         plt.savefig(
             os.path.join(
                 self.output_path,
@@ -1037,7 +1046,7 @@ class Laws:
         buffer_plot_model.seek(0)
         return buffer_plot_distribution, buffer_plot_model
 
-    def _plot_doupble_distribution(
+    def _plot_double_distribution(
         self,
         left_model,
         right_model,
@@ -1133,8 +1142,9 @@ class Laws:
             self._add_pdf_cell(
                 f'{best_fit} with params: {filtered_df[["param1", "param2"]]}'
             )
-            self._add_pdf_table(param_frame)
-            self._add_pdf_plot(plot_obj, 200, 100)
+            self._add_pdf_curves_table(param_frame)
+            self._add_pdf_plot(plot_obj, 160, 100)
+            self.pdf_object.add_page()
 
         return wrapper
 
@@ -1142,8 +1152,41 @@ class Laws:
         def wrapper(self, *args, **kwargs):
             results = func(self, *args, **kwargs)
 
-        return wrapper
+            self.stats_frame.add_data({results[0]: results[1].model["name"]})
+            self.stats_frame.add_data(
+                {f"{results[0]}_params": results[1].model["params"]}
+            )
+            self._add_pdf_cell(f"{results[0]}")
+            self._add_pdf_cell(
+                f'{results[1].model["name"]} with params: {results[1].model["params"]}'
+            )
+            self._add_pdf_distribution_table(results[1].summary[["name", "score"]])
+            self._add_pdf_plot(results[2], 100, 70)
+            self._add_pdf_plot(results[3], 100, 70)
+            self.pdf_object.add_page()
+            if len(results) == 5:
+                self._add_pdf_cell(
+                    f"At point {results[4][4]}, the flexion point of the distributions was found"
+                )
+                self._add_pdf_cell(
+                    f'Left distribution is {results[4][0].model["name"]} with params: {results[4][0].model["params"]}'
+                )
+                self._add_pdf_cell(
+                    f'Right distribution is {results[4][1].model["name"]} with params: {results[4][1].model["params"]}'
+                )
+                plot_distribution, plot_models = self._plot_double_distribution(
+                    results[4][0],
+                    results[4][1],
+                    results[4][2],
+                    results[4][3],
+                    results[4][4],
+                    results[0],
+                )
+                self._add_pdf_plot(plot_distribution, 100, 70)
+                self._add_pdf_plot(plot_models, 100, 70)
+                self.pdf_object.add_page()
 
+        return wrapper
 
     def check_curve_fit(func):
         def wrapper(self, *args, **kwargs):
@@ -1168,21 +1211,25 @@ class Laws:
             plot_distribution_obj, plot_model_obj = self._plot_distribution(
                 model, data, func.__name__
             )
-            if model.model["name"] not in const.DISTRIBUTIONS and data.shape[0]>=4:#FIXME:
+            if (
+                model.model["name"] not in const.DISTRIBUTIONS and data.shape[0] >= 4
+            ):  # FIXME:
                 flexation_point_detection_results = Flexation().find_distributions(
                     model, np.sort(data.values)
                 )
                 if flexation_point_detection_results != None:
+
                     return (
+                        func.__name__,
                         model,
                         plot_distribution_obj,
                         plot_model_obj,
                         flexation_point_detection_results,
                     )
                 else:
-                    return model, plot_distribution_obj, plot_model_obj
+                    return func.__name__, model, plot_distribution_obj, plot_model_obj
             else:
-                return model, plot_distribution_obj, plot_model_obj
+                return func.__name__, model, plot_distribution_obj, plot_model_obj
 
         return wrapper
 
@@ -1443,7 +1490,7 @@ class ScalingLawsCalc:
         self.pdf.set_font("Arial", size=9)
         self.pdf.cell(200, 10, text=f"{self.animal_name}", ln=True, align="C")
 
-    def _preprocess_data(self) -> tuple:
+    def _preprocess_data(self) -> TrajectoriesFrame:
         preproc = Prepocessing()
         stats = Stats()
 
@@ -1500,13 +1547,14 @@ class ScalingLawsCalc:
         self.stats_frame.add_data({"max_area": stats.get_max_area(filtered_animals)})
 
         # FIXME: choose data for compressed csv and next step of calculations
-        return compressed_points, filtered_animals
+        return filtered_animals
 
     def process_file(self) -> None:
 
         self.stats_frame.add_data({"animal": self.animal_name})
 
-        compressed_points, filtered_animals = self._preprocess_data()
+        filtered_animals = self._preprocess_data()
+        filtered_animals.to_csv(os.path.join(self.output_dir,f'compressed_{self.animal_name}.csv'))
 
         min_label_no = [
             [value]

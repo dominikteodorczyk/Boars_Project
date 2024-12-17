@@ -3,9 +3,8 @@ import glob
 import logging
 import pandas as pd
 import numpy as np
-from src.utils.dataIO import DataPrepocessing, DataIO, get_file_paths, create_output_directory
-from src.utils.laws import Stats, Laws, Prepocessing, ScalingLawsCalc, DataSetStats
-from src.measures.measures import Measures
+from src.dataIO import DataIO, get_file_paths, create_output_directory
+from src.laws import ScalingLawsCalc, DataSetStats
 import traceback
 import logging
 
@@ -42,7 +41,7 @@ def main():
             sl_calc = ScalingLawsCalc(clean_data, data_name, output_dir, dataset_stats)
             sl_calc.process_file()
 
-        dataset_stats.stats_set.to_csv('new_animal_stats.csv')
+        dataset_stats.stats_set.to_csv('animal_stats.csv')
 
     except Exception as e:
         logging.error(

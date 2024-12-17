@@ -31,20 +31,19 @@ python process_data.py
 import os
 import traceback
 import logging
-from src.utils.dataIO import (
-    DataPrepocessing,
+from src.dataIO import (
     DataIO,
     get_file_paths,
     create_output_directory
 )
-from src.utils.istop import InfoStopData
+from src.istop import InfoStopData
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 # Define the directory containing parsed data files
-PARSED_DATA_DIR = ''
+PARSED_DATA_DIR = '/home/dteodorczyk/Desktop/boars_repo/Boars_Project/test_data/1_PARSED'
 OUTPUT_DIR_NAME = 'infostop_output'
 
 
