@@ -6,7 +6,6 @@ from humobi.structures.trajectory import TrajectoriesFrame
 from humobi.measures.individual import *
 from humobi.tools.processing import *
 from humobi.tools.user_statistics import *
-from src.measures.stats import AnimalStatistics
 from fpdf import FPDF
 import matplotlib.pyplot as plt
 import seaborn as sns
