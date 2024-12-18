@@ -1,5 +1,5 @@
-from datetime import timedelta
-from numpy import ndarray, size
+
+from numpy import ndarray
 import pandas as pd
 import os
 import logging
@@ -16,7 +16,7 @@ from humobi.tools.user_statistics import *
 from constans import const
 import scipy.stats as scp_stats
 from distfit import distfit
-from functools import wraps
+
 from io import BytesIO
 from math import log
 from scipy.stats import wasserstein_distance
@@ -1112,7 +1112,7 @@ class Laws:
 
         plt.legend()
         plt.grid()
-
+        plt.loglog()
         plt.savefig(
             os.path.join(
                 self.output_path,
