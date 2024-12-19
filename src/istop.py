@@ -414,11 +414,16 @@ class DataAnalystInfostop:
         data_analyst_no : int
             Analysis identifier used in plot filenames.
         """
-        temporal_df = (
-            data.reset_index(level=1)
-            .groupby(level=0)
-            .apply(lambda x: x.datetime - x.datetime.shift())
-        )
+        if len(data.get_users()) != 1:
+            temporal_df = (
+                data.reset_index(level=1)
+                .groupby(level=0)
+                .apply(lambda x: x.datetime - x.datetime.shift())
+            )
+        else:
+            data_reset = data.reset_index()
+            temporal_df = data_reset['datetime'] - data_reset['datetime'].shift()
+
         temporal_df_median = temporal_df.median()
         temp_res_animal = temporal_df.groupby(level=0).median()
         in_minutes = temporal_df[~temporal_df.isna()].dt.total_seconds() / 60
