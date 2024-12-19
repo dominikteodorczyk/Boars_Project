@@ -611,14 +611,19 @@ class DataFilter:
             ValueError: If there is an error during data selection.
         """
         try:
-            temporal_df = (
-                data.reset_index(level=1)
-                .groupby(level=0)
-                .apply(lambda x: x.datetime - x.datetime.shift())
-            )
+            if len(data.get_users()) != 1:
+                temporal_df = (
+                    data.reset_index(level=1)
+                    .groupby(level=0)
+                    .apply(lambda x: x.datetime - x.datetime.shift())
+                )
+            else:
+                data_reset = data.reset_index()
+                temporal_df = data_reset['datetime'] - data_reset['datetime'].shift()
+
             temporal_df_median = temporal_df.median()
             avg_temp_res_str, avg_temp_res_int = self._match_timedelta(
-                timedelta=temporal_df_median
+                timedelta= temporal_df_median
             )
             resampled = (
                 data.groupby(level=0)
