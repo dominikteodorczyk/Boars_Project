@@ -107,7 +107,7 @@ def data_structuring(dataframe:pd.DataFrame) -> pd.DataFrame:
         dataframe.groupby('user_id', group_keys=False).apply(
             lambda x: x.sort_values('datetime')
             )
-        return dataframe.reset_index(drop=True)
+        return dataframe.reset_index(drop=True).dropna()
     except Exception as e:
         logging.error(f'Data structuring error: {e}')
 
@@ -199,13 +199,13 @@ def raw_data_parser(
         id_parsed = parse_id(dataframe=raw_data, cols=cols)
         time_parsed = parse_time(dataframe=id_parsed, cols=cols)
         data_structured = data_structuring(time_parsed)
-        if not breeding_periods:
+        if not breeding_periods and data_structured.shape[0] != 0:
             data_write(
                 dataframe=data_structured,
                 filename=file_name,
                 output_path=output_path
                 )
-        elif len(breeding_periods) == 2:
+        elif len(breeding_periods) == 2 and data_structured.shape[0] != 0:
             in_breeding_periods = filter_by_month_range(
                 data_structured,
                 breeding_periods[0],
@@ -218,16 +218,18 @@ def raw_data_parser(
                 breeding_periods[1],
                 False
             )
-            data_write(
-                dataframe=in_breeding_periods,
-                filename=f'in_breeding_{file_name}',
-                output_path=output_path
-                )
-            data_write(
-                dataframe=out_breeding_periods,
-                filename=f'out_breeding_{file_name}',
-                output_path=output_path
-                )
+            if in_breeding_periods.shape[0] != 0:
+                data_write(
+                    dataframe=in_breeding_periods,
+                    filename=f'in_breeding_{file_name}',
+                    output_path=output_path
+                    )
+            if out_breeding_periods.shape[0] != 0:
+                data_write(
+                    dataframe=out_breeding_periods,
+                    filename=f'out_breeding_{file_name}',
+                    output_path=output_path
+                    )
 
         logging.info(
             f'{file_name} parsed successfully. '
@@ -263,7 +265,6 @@ def multi_raw_data_parser(
     """
     for key, value in data_dict.items():
         breeding_periods = periods_dict[os.path.basename(key)]
-        print(breeding_periods)
         raw_data_parser(
             input_path=key,
             cols=value,
