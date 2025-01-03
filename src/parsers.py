@@ -2,6 +2,7 @@ import json
 import pandas as pd
 import os
 import logging
+from typing import Optional
 from pandas.errors import ParserError
 
 logging.basicConfig(
@@ -31,7 +32,7 @@ def test_data_detector(id: str) -> bool:
         return False
 
 
-def parse_id(dataframe:pd.DataFrame, cols:list) -> pd.DataFrame:
+def parse_id(dataframe:pd.DataFrame, cols:list) -> Optional[pd.DataFrame]:
     """
     Processes the user ID column by removing test data and mapping
     unique IDs to integers.
@@ -61,7 +62,7 @@ def parse_id(dataframe:pd.DataFrame, cols:list) -> pd.DataFrame:
         logging.error(f'ID parser error: {e}')
 
 
-def parse_time(dataframe:pd.DataFrame, cols:list) -> pd.DataFrame:
+def parse_time(dataframe:pd.DataFrame, cols:list) -> Optional[pd.DataFrame]:
     """
     Converts the time column to a standard datetime format.
 
@@ -86,7 +87,7 @@ def parse_time(dataframe:pd.DataFrame, cols:list) -> pd.DataFrame:
         logging.error(f'Time parser error: {e}')
 
 
-def data_structuring(dataframe:pd.DataFrame) -> pd.DataFrame:
+def data_structuring(dataframe:pd.DataFrame) -> Optional[pd.DataFrame]:
     """
     Structures the DataFrame by renaming columns and resetting
     the index.
@@ -131,7 +132,7 @@ def filter_by_month_range(data, start, end, in_out=True):
     return result
 
 
-def data_write(dataframe:pd.DataFrame, filename:str, output_path:str=None):
+def data_write(dataframe:pd.DataFrame, filename:str, output_path:Optional[str]=None):
     """
     Writes the processed DataFrame to a CSV file.
 
@@ -166,8 +167,8 @@ def data_write(dataframe:pd.DataFrame, filename:str, output_path:str=None):
 def raw_data_parser(
         input_path:str,
         cols:list,
-        output_path:str = None,
-        breeding_periods:list = None
+        output_path:Optional[str] = None,
+        breeding_periods:Optional[list] = None
 ) -> None:
     """
     Parses and processes raw data from a CSV file.
@@ -243,7 +244,7 @@ def raw_data_parser(
 def multi_raw_data_parser(
         data_dict:dict,
         periods_dict:dict,
-        output_path:str = None
+        output_path:Optional[str] = None
 ) -> None:
     """
     Parses raw data from multiple CSV files.
@@ -275,37 +276,43 @@ def multi_raw_data_parser(
 
 
 def parse_data(
-        json_source:str = None,
-        periods:str = None,
-        path:str = None,
-        cols:str = None,
-        output_path:str = None
-        ):
+        json_source: Optional[str] = None,
+        periods: Optional[str] = None,
+        path: Optional[str] = None,
+        cols: Optional[list[str]] = None,
+        output_path: Optional[str] = None
+    ) -> None:
     """
-    Parses raw data from either a JSON source or direct file path.
+    Parses raw data from either a JSON configuration or a single file.
 
-    This function can either process multiple files using a JSON
-    configuration or a single file specified by path and column
-    names. The results can be saved to an output directory.
+    This function supports two modes of operation:
+    1. Using a JSON configuration file to process multiple CSV files.
+    2. Parsing a single CSV file with specified columns.
 
     Args:
-        json_source (str, optional): Path to a JSON file that contains
-            a dictionary of file paths and column specifications.
-        path (str, optional): Path to a single CSV file to be processed.
-        cols (list, optional): List of column names for the single CSV file.
-        output_path (str, optional): Directory to save the processed file(s).
-            If None, saves in the current directory.
+        json_source (Optional[str]): Path to a JSON file containing
+            a mapping of file paths and column specifications. Required
+            for processing multiple files.
+        periods (Optional[str]): Path to a JSON file containing additional
+            configuration (e.g., periods) for multi-file processing.
+        path (Optional[str]): Path to a single CSV file for direct processing.
+        cols (Optional[List[str]]): List of column names to be used
+            when processing a single CSV file. Required if `path` is provided.
+        output_path (Optional[str]): Directory to save processed file(s).
+            Defaults to the current directory if not specified.
 
     Returns:
         None
 
     Raises:
-        Exception: Raised if there is any issue during the parsing process.
+        ValueError: If required arguments are missing or invalid.
+        Exception: For any unexpected errors during processing.
 
-    Example:
+    Examples:
         # Example with JSON configuration for multiple files:
         parse_data(
             json_source='data/config.json',
+            periods='data/periods.json',
             output_path='data/processed'
         )
 
