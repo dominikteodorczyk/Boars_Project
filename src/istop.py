@@ -596,12 +596,12 @@ class DataFilter:
                              f"to UNIX timestamps: {e}"
                         )
 
-    def select_best_period(self, data: pd.DataFrame) -> TrajectoriesFrame:
+    def select_best_period(self, data: TrajectoriesFrame) -> TrajectoriesFrame:
         """
         Selects the best periods of data to maximize coverage.
 
         Args:
-            data (pd.DataFrame): The input data containing user trajectories.
+            data (TrajectoriesFrame): The input data containing user trajectories.
 
         Returns:
             TrajectoriesFrame: A TrajectoriesFrame object containing
@@ -623,7 +623,7 @@ class DataFilter:
 
             temporal_df_median = temporal_df.median()
             avg_temp_res_str, avg_temp_res_int = self._match_timedelta(
-                timedelta= temporal_df_median
+                timedelta= temporal_df_median # type: ignore
             )
             resampled = (
                 data.groupby(level=0)
