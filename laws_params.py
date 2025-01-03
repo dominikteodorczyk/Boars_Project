@@ -33,13 +33,16 @@ def main():
 
         # Process each file
         for parsed_file in file_paths:
-            logging.info(f"Processing file: {parsed_file}")
+            try:
+                logging.info(f"Processing file: {parsed_file}")
 
-            clean_data = DataIO.open_for_scaling_laws(parsed_file)
-            data_name = DataIO.get_animal_name(parsed_file)
+                clean_data = DataIO.open_for_scaling_laws(parsed_file)
+                data_name = DataIO.get_animal_name(parsed_file)
 
-            sl_calc = ScalingLawsCalc(clean_data, data_name, output_dir, dataset_stats)
-            sl_calc.process_file()
+                sl_calc = ScalingLawsCalc(clean_data, data_name, output_dir, dataset_stats)
+                sl_calc.process_file()
+            except Exception as e:
+                logging.warning(f'There is problem with {os.path.basename(parsed_file)}: {e}')
 
         dataset_stats.stats_set.to_csv('animal_stats.csv')
 
