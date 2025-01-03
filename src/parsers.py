@@ -126,9 +126,6 @@ def filter_by_month_range(data, start, end, in_out=True):
         result = data[condition]
     else:
         result = data[~condition]
-
-    # result['datetime'] = result['datetime'].apply(lambda x: int(x.timestamp()))
-
     return result
 
 
