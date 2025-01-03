@@ -1,5 +1,5 @@
-from datetime import timedelta
-from numpy import ndarray, size
+
+from numpy import ndarray
 import pandas as pd
 import os
 import logging
@@ -10,13 +10,13 @@ from fpdf import FPDF
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from humobi.measures.individual import *
-from humobi.tools.processing import *
-from humobi.tools.user_statistics import *
+from scipy.optimize import curve_fit
+from humobi.measures.individual import visitation_frequency, jump_lengths, distinct_locations_over_time, radius_of_gyration, mean_square_displacement, num_of_distinct_locations
+from humobi.tools.processing import rowwise_average, convert_to_distribution, start_end
 from constans import const
 import scipy.stats as scp_stats
 from distfit import distfit
-from functools import wraps
+from tqdm import tqdm
 from io import BytesIO
 from math import log
 from scipy.stats import wasserstein_distance
@@ -1112,7 +1112,7 @@ class Laws:
 
         plt.legend()
         plt.grid()
-
+        plt.loglog()
         plt.savefig(
             os.path.join(
                 self.output_path,

@@ -414,11 +414,16 @@ class DataAnalystInfostop:
         data_analyst_no : int
             Analysis identifier used in plot filenames.
         """
-        temporal_df = (
-            data.reset_index(level=1)
-            .groupby(level=0)
-            .apply(lambda x: x.datetime - x.datetime.shift())
-        )
+        if len(data.get_users()) != 1:
+            temporal_df = (
+                data.reset_index(level=1)
+                .groupby(level=0)
+                .apply(lambda x: x.datetime - x.datetime.shift())
+            )
+        else:
+            data_reset = data.reset_index()
+            temporal_df = data_reset['datetime'] - data_reset['datetime'].shift()
+
         temporal_df_median = temporal_df.median()
         temp_res_animal = temporal_df.groupby(level=0).median()
         in_minutes = temporal_df[~temporal_df.isna()].dt.total_seconds() / 60
@@ -591,12 +596,12 @@ class DataFilter:
                              f"to UNIX timestamps: {e}"
                         )
 
-    def select_best_period(self, data: pd.DataFrame) -> TrajectoriesFrame:
+    def select_best_period(self, data: TrajectoriesFrame) -> TrajectoriesFrame:
         """
         Selects the best periods of data to maximize coverage.
 
         Args:
-            data (pd.DataFrame): The input data containing user trajectories.
+            data (TrajectoriesFrame): The input data containing user trajectories.
 
         Returns:
             TrajectoriesFrame: A TrajectoriesFrame object containing
@@ -606,14 +611,19 @@ class DataFilter:
             ValueError: If there is an error during data selection.
         """
         try:
-            temporal_df = (
-                data.reset_index(level=1)
-                .groupby(level=0)
-                .apply(lambda x: x.datetime - x.datetime.shift())
-            )
+            if len(data.get_users()) != 1:
+                temporal_df = (
+                    data.reset_index(level=1)
+                    .groupby(level=0)
+                    .apply(lambda x: x.datetime - x.datetime.shift())
+                )
+            else:
+                data_reset = data.reset_index()
+                temporal_df = data_reset['datetime'] - data_reset['datetime'].shift()
+
             temporal_df_median = temporal_df.median()
             avg_temp_res_str, avg_temp_res_int = self._match_timedelta(
-                timedelta=temporal_df_median
+                timedelta= temporal_df_median # type: ignore
             )
             resampled = (
                 data.groupby(level=0)

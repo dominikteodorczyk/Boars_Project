@@ -43,7 +43,7 @@ logging.basicConfig(
 )
 
 # Define the directory containing parsed data files
-PARSED_DATA_DIR = '/home/dteodorczyk/Desktop/boars_repo/Boars_Project/test_data/1_PARSED'
+PARSED_DATA_DIR = ''
 OUTPUT_DIR_NAME = 'infostop_output'
 
 
