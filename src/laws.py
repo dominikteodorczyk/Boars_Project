@@ -39,7 +39,7 @@ class Curves:
     @staticmethod
     def linear(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
-        Computes a linear transformation: y = a * x * b.
+        Computes a linear transformation: y = a*x + b.
 
         Parameters:
         x (array-like): Input values.
@@ -50,7 +50,7 @@ class Curves:
         array-like: Transformed values.
         """
         x = x.astype(float)
-        return a * x * b
+        return a*x + b
 
     @staticmethod
     def expon(x: np.ndarray, a: float, b: float) -> np.ndarray:
