@@ -167,7 +167,7 @@ class Curves:
     @staticmethod
     def sigmoid(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
-        Computes a sigmoid curve: y = 1 / (1 + exp(a*x + b)).
+        Computes a sigmoid curve: y = 1 / (1 + exp(a*x)).
 
         Parameters:
         x (array-like): Input values.
@@ -178,7 +178,7 @@ class Curves:
         array-like: Transformed values.
         """
         x = x.astype(float)
-        return 1 / (1 + np.exp(a * x + b))
+        return 1 / (1 + np.exp(a * x))
 
     @staticmethod
     def quad(x: np.ndarray, a: float, b: float, c: float) -> np.ndarray:
