@@ -163,3 +163,4 @@ cython_debug/
 
 *.csv
 test_data/*
+.ipynb

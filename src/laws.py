@@ -39,7 +39,7 @@ class Curves:
     @staticmethod
     def linear(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
-        Computes a linear transformation: y = a * x * b.
+        Computes a linear transformation: y = a*x.
 
         Parameters:
         x (array-like): Input values.
@@ -50,7 +50,7 @@ class Curves:
         array-like: Transformed values.
         """
         x = x.astype(float)
-        return a * x * b
+        return a*x
 
     @staticmethod
     def expon(x: np.ndarray, a: float, b: float) -> np.ndarray:
@@ -167,7 +167,7 @@ class Curves:
     @staticmethod
     def sigmoid(x: np.ndarray, a: float, b: float) -> np.ndarray:
         """
-        Computes a sigmoid curve: y = 1 / (1 + exp(a*x + b)).
+        Computes a sigmoid curve: y = 1 / (1 + exp(a*x)).
 
         Parameters:
         x (array-like): Input values.
@@ -178,7 +178,7 @@ class Curves:
         array-like: Transformed values.
         """
         x = x.astype(float)
-        return 1 / (1 + np.exp(a * x + b))
+        return 1 / (1 + np.exp(a * x))
 
     @staticmethod
     def quad(x: np.ndarray, a: float, b: float, c: float) -> np.ndarray:
@@ -1248,7 +1248,7 @@ class Laws:
             self.curve_fitting.model_choose(avg_vf)
         )
 
-        return best_fit, global_params, y_pred, expon_y_pred, avg_vf, ["f", "Rank"]
+        return best_fit, global_params, y_pred, expon_y_pred, avg_vf, ["Rank","f"]
 
     @log_curve_fitting_resluts
     @check_curve_fit
@@ -1266,7 +1266,7 @@ class Laws:
             DistributionFitingTools().model_choose(avg_dlot)
         )
 
-        return best_fit, global_params, y_pred, expon_y_pred, avg_dlot, ["S(t)", "t"]
+        return best_fit, global_params, y_pred, expon_y_pred, avg_dlot, ["t","S(t)"]
 
     @log_distribution_fitting_resluts
     @check_distribution_fit
@@ -1380,7 +1380,7 @@ class Laws:
             DistributionFitingTools().model_choose(avg_msd)
         )
 
-        return best_fit, global_params, y_pred, expon_y_pred, avg_msd, ["MSD", "t"]
+        return best_fit, global_params, y_pred, expon_y_pred, avg_msd, ["t","MSD"]
 
     @log_distribution_fitting_resluts
     @check_distribution_fit
