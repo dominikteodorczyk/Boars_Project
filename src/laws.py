@@ -1248,7 +1248,7 @@ class Laws:
             self.curve_fitting.model_choose(avg_vf)
         )
 
-        return best_fit, global_params, y_pred, expon_y_pred, avg_vf, ["f", "Rank"]
+        return best_fit, global_params, y_pred, expon_y_pred, avg_vf, ["Rank","f"]
 
     @log_curve_fitting_resluts
     @check_curve_fit
@@ -1266,7 +1266,7 @@ class Laws:
             DistributionFitingTools().model_choose(avg_dlot)
         )
 
-        return best_fit, global_params, y_pred, expon_y_pred, avg_dlot, ["S(t)", "t"]
+        return best_fit, global_params, y_pred, expon_y_pred, avg_dlot, ["t","S(t)"]
 
     @log_distribution_fitting_resluts
     @check_distribution_fit
@@ -1380,7 +1380,7 @@ class Laws:
             DistributionFitingTools().model_choose(avg_msd)
         )
 
-        return best_fit, global_params, y_pred, expon_y_pred, avg_msd, ["MSD", "t"]
+        return best_fit, global_params, y_pred, expon_y_pred, avg_msd, ["t","MSD"]
 
     @log_distribution_fitting_resluts
     @check_distribution_fit
