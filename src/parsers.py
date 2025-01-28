@@ -112,6 +112,10 @@ def data_structuring(dataframe:pd.DataFrame) -> Optional[pd.DataFrame]:
     except Exception as e:
         logging.error(f'Data structuring error: {e}')
 
+def filter_racords(dataframe:pd.DataFrame) -> pd.DataFrame:
+    dataframe_without_zeros = dataframe[~((dataframe['lat'] == 0) & (dataframe['lon'] == 0))]
+    return dataframe_without_zeros.drop_duplicates()
+
 
 def filter_by_month_range(data, start, end, in_out=True):
     data['datetime'] = pd.to_datetime(data['datetime'], errors='coerce')
@@ -197,21 +201,22 @@ def raw_data_parser(
         id_parsed = parse_id(dataframe=raw_data, cols=cols)
         time_parsed = parse_time(dataframe=id_parsed, cols=cols)
         data_structured = data_structuring(time_parsed)
-        if not breeding_periods and data_structured.shape[0] != 0:
+        filtred = filter_racords(data_structured)
+        if not breeding_periods and filtred.shape[0] != 0:
             data_write(
-                dataframe=data_structured,
+                dataframe=filtred,
                 filename=file_name,
                 output_path=output_path
                 )
-        elif len(breeding_periods) == 2 and data_structured.shape[0] != 0:
+        elif len(breeding_periods) == 2 and filtred.shape[0] != 0:
             in_breeding_periods = filter_by_month_range(
-                data_structured,
+                filtred,
                 breeding_periods[0],
                 breeding_periods[1],
                 True
             )
             out_breeding_periods = filter_by_month_range(
-                data_structured,
+                filtred,
                 breeding_periods[0],
                 breeding_periods[1],
                 False
@@ -231,7 +236,7 @@ def raw_data_parser(
 
         logging.info(
             f'{file_name} parsed successfully. '
-            f'Changing the no. of rows: {rows_no}->{data_structured.shape[0]}'
+            f'Changing the no. of rows: {rows_no}->{filtred.shape[0]}'
             )
 
     except Exception as e:
