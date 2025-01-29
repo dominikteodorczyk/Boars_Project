@@ -1339,9 +1339,9 @@ class Laws:
 
     @log_curve_fitting_resluts
     @check_curve_fit
-    def rog_over_time(self, data: TrajectoriesFrame) -> tuple:
+    def rog_over_time(self, data: TrajectoriesFrame, min_records_no: int) -> tuple:
         rog = radius_of_gyration(data, time_evolution=True)
-        avg_rog = rowwise_average(rog)
+        avg_rog = rowwise_average(rog,row_count=min_records_no)
         avg_rog = avg_rog[~avg_rog.isna()]
 
         # model selection
@@ -1362,7 +1362,6 @@ class Laws:
     @check_distribution_fit
     def msd_distribution(self, data: TrajectoriesFrame) -> tuple:
         msd = mean_square_displacement(data, time_evolution=False, from_center=True)
-
         # Fit to find the best theoretical distribution
         model = distfit(stats="wasserstein")
         model.fit_transform(msd.values)
@@ -1580,15 +1579,16 @@ class ScalingLawsCalc:
         laws.jump_lengths_distribution(filtered_animals)
         laws.waiting_times(filtered_animals)
         laws.msd_curve(filtered_animals, min_records)
-        laws.travel_times(filtered_animals)
-        laws.rog(filtered_animals)
-        laws.rog_over_time(filtered_animals)
+        # laws.travel_times(filtered_animals)
+        # laws.rog(filtered_animals)
+        laws.rog_over_time(filtered_animals, min_records)
         laws.msd_distribution(filtered_animals)
-        laws.msd_curve(filtered_animals, min_records)
-        laws.return_time_distribution(filtered_animals)
-        laws.exploration_time(filtered_animals)
+        # laws.msd_curve(filtered_animals, min_records)
+        # laws.return_time_distribution(filtered_animals)
+        # laws.exploration_time(filtered_animals)
 
         pdf_path = os.path.join(self.output_dir_animal, f"{self.animal_name}.pdf")
         self.pdf.output(pdf_path)
 
         self.stats_frame.add_record()
+
