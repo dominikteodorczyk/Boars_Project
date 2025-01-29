@@ -21,6 +21,7 @@ from itertools import product
 import pandas as pd
 from infostop import Infostop
 import numpy as np
+from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
 from tqdm import tqdm
 from fpdf import FPDF
 from humobi.structures.trajectory import TrajectoriesFrame
@@ -886,6 +887,19 @@ class LabelsCalc:
             )
             trajectory = trajectory[trajectory.labels != -1]
 
+            pts = trajectory[['lat', 'lon']].values
+            lbls = trajectory['labels'].values
+            if len(set(lbls)) < 2 or len(set(lbls)) >= len(pts):
+                silhouette = -1
+                calinski = 0
+                davies_bouldin = 1000
+
+            else:
+                silhouette = silhouette_score(pts, lbls)
+                calinski = calinski_harabasz_score(pts, lbls)
+                davies_bouldin = davies_bouldin_score(pts, lbls)
+
+
             total_stops = len(np.unique(labels))
             results = {
                 "animal_id": user_id,
@@ -894,6 +908,9 @@ class LabelsCalc:
                 "R1": r1,
                 "R2": r2,
                 "Tmin": min_staying_time,
+                'SHTT':silhouette,
+                'CH': calinski,
+                'DB':davies_bouldin
             }
             return results
 
@@ -1060,6 +1077,12 @@ class LabelsCalc:
         plt.title(f"Median Total Stops by {param}")
 
         buffer = BytesIO()
+        plt.savefig(
+            os.path.join(
+                self.output_path,
+                f"Median Total Stops by {param}",
+            )
+        )
         plt.savefig(buffer, format="png")
         plt.close()
         buffer.seek(0)
@@ -1121,6 +1144,106 @@ class LabelsCalc:
         self._add_pdf_plot(plot_obj, 200, 150)
 
         return stabilization_point_index
+
+
+
+    def _choose_param_value_with_clustering_params(self, data: pd.DataFrame, param: str) -> float:
+        """
+        Choose the optimal value for a given parameter based on
+        the sensitivity matrix.
+
+        The method identifies a stabilization point for the parameter,
+        where the total stops stabilize with minimal changes in the
+        corresponding value.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The data containing the results of parameter sensitivity.
+        param : str
+            The parameter to optimize. Should be one of ["R1", "Tmin"].
+
+        Returns
+        -------
+        float
+            The selected optimal parameter value based on
+            the stabilization point.
+        """
+
+        result_med = data.groupby(["animal_id", param]).median()
+        param_value = result_med.index
+        med_totalstops = result_med.groupby(
+            level=param
+        )["Total_stops"].median()
+
+        med_sh = result_med.groupby(
+            level=param
+        )["SHTT"].median()
+
+        med_ch = result_med.groupby(
+            level=param
+        )["CH"].median()
+
+        med_db = result_med.groupby(
+            level=param
+        )["DB"].median()
+        print(med_sh)
+
+        pd.DataFrame({
+        # f"{param}": param_value,
+        "totalstops": med_totalstops.reset_index(drop=True),
+        "sh": med_sh.reset_index(drop=True),
+        "ch": med_ch.reset_index(drop=True),
+        "db": med_db.reset_index(drop=True)
+        }).to_csv(f'{param}_scores_values.csv')
+        stabilization_point_index = 200
+
+        plot_obj = self._plot_param_with_clustering_measures(
+            param, med_totalstops, med_sh, med_ch,med_db   # type: ignore
+        )
+
+
+
+        self._add_pdf_cell(f"{param} value: {stabilization_point_index}")
+        self._add_pdf_plot(plot_obj, 200, 150)
+
+        return stabilization_point_index
+
+    def _plot_param_with_clustering_measures(
+        self,
+        param: str,
+        total_stops,
+        shtt,
+        ch,
+        db
+    ) -> BytesIO:
+
+        plt.figure(figsize=(25, 20))
+
+        # Dodanie serii jako wykresów liniowych
+        plt.plot(total_stops, label='Total stops', linestyle='-', linewidth=2)
+        plt.plot(shtt, label='Silhouette', linestyle='-', linewidth=2)
+        plt.plot(ch, label='Calinski-Harabasz', linestyle='-', linewidth=2)
+        plt.plot(db, label='Davies Bouldin', linestyle='-', linewidth=2)
+
+        # Dodanie tytułu, etykiet osi i legendy
+        plt.title(f"Medians of scors for {param}")
+        plt.xlabel(param)
+        plt.ylabel("Values")
+        plt.legend()  # Wyświetlenie legendy
+
+        buffer = BytesIO()
+        plt.savefig(
+            os.path.join(
+                self.output_path,
+                f"Medians of scors for {param}",
+            )
+        )
+        plt.savefig(buffer, format="png")
+        plt.close()
+        buffer.seek(0)
+        return buffer
+
 
     def _choose_best_params(
         self, sensitivity_matrix: pd.DataFrame
@@ -1302,6 +1425,7 @@ class InfoStopData:
 
                 # Step 4: Sort the data
                 sorted_data = filter.sort_data(filtred_data)
+
 
                 # Step 5: Process data with the infostop module
                 trajectory_processed_data = labels_calculator.calculate_infostop(
