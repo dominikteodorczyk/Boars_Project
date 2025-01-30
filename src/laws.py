@@ -8,6 +8,8 @@ import scipy
 import scipy.stats
 from fpdf import FPDF
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
 import seaborn as sns
 import numpy as np
 from scipy.optimize import curve_fit
@@ -1256,7 +1258,7 @@ class Laws:
         self, data: TrajectoriesFrame, min_labels_no: int
     ) -> tuple:
 
-        dlot = distinct_locations_over_time(data)
+        dlot = distinct_locations_over_time(data,reaggregate = True, resolution = '1H')
         avg_dlot = rowwise_average(dlot, row_count=min_labels_no)
         avg_dlot.index += 1
         dlot.groupby(level=0).size().median()
