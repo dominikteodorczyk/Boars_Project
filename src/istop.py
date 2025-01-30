@@ -1269,6 +1269,7 @@ class LabelsCalc:
         """
         try:
             r1 = self._choose_param_value(sensitivity_matrix, "R1")
+            self.pdf_object.add_page()
             r2 = self._choose_param_value(sensitivity_matrix, "R2")
             self.pdf_object.add_page()  # Start a new page for the next section of raport
             Tmin = self._choose_param_value(sensitivity_matrix, "Tmin")

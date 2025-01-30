@@ -194,55 +194,55 @@ def raw_data_parser(
     Returns:
         None
     """
-    # try:
-    file_name = os.path.basename(input_path)
+    try:
+        file_name = os.path.basename(input_path)
 
-    raw_data = pd.read_csv(input_path, low_memory=False)[cols]
-    rows_no = raw_data.shape[0]
+        raw_data = pd.read_csv(input_path, low_memory=False)[cols]
+        rows_no = raw_data.shape[0]
 
-    id_parsed = parse_id(dataframe=raw_data, cols=cols)
-    time_parsed = parse_time(dataframe=id_parsed, cols=cols)
-    data_structured = data_structuring(time_parsed)
-    filtred = filter_records(data_structured)
-    if not breeding_periods and filtred.shape[0] != 0:
-        data_write(
-            dataframe=filtred,
-            filename=file_name,
-            output_path=output_path
+        id_parsed = parse_id(dataframe=raw_data, cols=cols)
+        time_parsed = parse_time(dataframe=id_parsed, cols=cols)
+        data_structured = data_structuring(time_parsed)
+        filtred = filter_records(data_structured)
+        if not breeding_periods and filtred.shape[0] != 0:
+            data_write(
+                dataframe=filtred,
+                filename=file_name,
+                output_path=output_path
+                )
+        elif len(breeding_periods) == 2 and filtred.shape[0] != 0:
+            in_breeding_periods = filter_by_month_range(
+                filtred,
+                breeding_periods[0],
+                breeding_periods[1],
+                True
             )
-    elif len(breeding_periods) == 2 and filtred.shape[0] != 0:
-        in_breeding_periods = filter_by_month_range(
-            filtred,
-            breeding_periods[0],
-            breeding_periods[1],
-            True
-        )
-        out_breeding_periods = filter_by_month_range(
-            filtred,
-            breeding_periods[0],
-            breeding_periods[1],
-            False
-        )
-        if in_breeding_periods.shape[0] != 0:
-            data_write(
-                dataframe=in_breeding_periods,
-                filename=f'in_breeding_{file_name}',
-                output_path=output_path
-                )
-        if out_breeding_periods.shape[0] != 0:
-            data_write(
-                dataframe=out_breeding_periods,
-                filename=f'out_breeding_{file_name}',
-                output_path=output_path
-                )
+            out_breeding_periods = filter_by_month_range(
+                filtred,
+                breeding_periods[0],
+                breeding_periods[1],
+                False
+            )
+            if in_breeding_periods.shape[0] != 0:
+                data_write(
+                    dataframe=in_breeding_periods,
+                    filename=f'in_breeding_{file_name}',
+                    output_path=output_path
+                    )
+            if out_breeding_periods.shape[0] != 0:
+                data_write(
+                    dataframe=out_breeding_periods,
+                    filename=f'out_breeding_{file_name}',
+                    output_path=output_path
+                    )
 
-    logging.info(
-        f'{file_name} parsed successfully. '
-        f'Changing the no. of rows: {rows_no}->{filtred.shape[0]}'
-        )
+        logging.info(
+            f'{file_name} parsed successfully. '
+            f'Changing the no. of rows: {rows_no}->{filtred.shape[0]}'
+            )
 
-    # except Exception as e:
-    #     logging.error(f'Error in {file_name}: \n{e}')
+    except Exception as e:
+        logging.error(f'Error in {file_name}: \n{e}')
 
 
 def multi_raw_data_parser(

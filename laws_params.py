@@ -7,6 +7,8 @@ from src.dataIO import DataIO, get_file_paths, create_output_directory
 from src.laws import ScalingLawsCalc, DataSetStats
 import traceback
 import logging
+import matplotlib
+matplotlib.use('Agg')
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"

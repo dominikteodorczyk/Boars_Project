@@ -21,10 +21,10 @@ MAX_TIME_BETWEEN = 86400
 
 #infostop params
 R1_MIN = 50
-R1_MAX = 1000
+R1_MAX = 10000000000
 TMIN_MIN = 600
-TMIN_MAX = 3600
-BEST_POINT_NO = 5 # Take top 5 points with minimal changes and look for maximum TOTAL STOPS
+TMIN_MAX = 10000000000
+BEST_POINT_NO = 15 # Take top 5 points with minimal changes and look for maximum TOTAL STOPS
 
 ## laws params filtration thresholds
 MIN_LABEL_NO = 3
