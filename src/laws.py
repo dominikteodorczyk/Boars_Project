@@ -942,19 +942,32 @@ class Laws:
             raise RuntimeError(f"Failed to add plot to PDF: {e}")
 
     def _add_pdf_curves_table(self, data):
-        self.pdf_object.ln(10)  # Nowa linia
-        self.pdf_object.cell(40, 5, "Curve", border=1, align="C")
-        self.pdf_object.cell(40, 5, "Weight", border=1, align="C")
-        self.pdf_object.cell(40, 5, "Param1", border=1, align="C")
-        self.pdf_object.cell(40, 5, "Param2", border=1, align="C")
+        self.pdf_object.ln(5)  # Nowa linia
+        # Mniejsza czcionka
+        self.pdf_object.set_font("Arial", size=8)
+
+        # Nagłówki tabeli (pogrubione)
+        self.pdf_object.set_font("Arial", style="B", size=8)
+        self.pdf_object.cell(25, 4, "Curve", border='TB', align="C")
+        self.pdf_object.cell(25, 4, "Weight", border='TB', align="C")
+        self.pdf_object.cell(25, 4, "Param 1", border='TB', align="C")
+        self.pdf_object.cell(25, 4, "Param 2", border='TB', align="C")
         self.pdf_object.ln()
 
+        # Resetowanie czcionki do zwykłej
+        self.pdf_object.set_font("Arial", size=8)
+
+        # Wiersze tabeli
         for index, row in data.iterrows():
-            self.pdf_object.cell(40, 5, row["curve"], border=1, align="C")
-            self.pdf_object.cell(40, 5, str(row["weight"]), border=1, align="C")
-            self.pdf_object.cell(40, 5, str(row["param1"]), border=1, align="C")
-            self.pdf_object.cell(40, 5, str(row["param2"]), border=1, align="C")
+            self.pdf_object.cell(25, 4, row["curve"], border=0, align="C")
+            self.pdf_object.cell(25, 4, str(round(row["weight"],10)), border=0, align="C")
+            self.pdf_object.cell(25, 4, str(round(row["param1"],10)), border=0, align="C")
+            self.pdf_object.cell(25, 4, str(round(row["param2"],10)), border=0, align="C")
             self.pdf_object.ln()
+
+        # Linia pod całą tabelą
+        self.pdf_object.cell(100, 0, "", border="T")
+        self.pdf_object.ln(5)  # Mały odstęp po tabeli
 
     def _add_pdf_distribution_table(self, data):
         self.pdf_object.ln(10)  # Nowa linia
@@ -973,22 +986,23 @@ class Laws:
     def _plot_curve(self, func_name, plot_data, y_pred, labels, exp_y_pred=None):
         buffer = BytesIO()
 
-        # Display of data fitted curve
         sns.set_style("whitegrid")
-        fig = plt.figure(figsize=(8, 5))
-        # ax = fig.add_subplot(1, 1, 1)
+        plt.figure(figsize=(8, 5))
 
         if exp_y_pred is not None and exp_y_pred.size > 0:
-            plt.plot(plot_data.index, y_pred, c="k", label="Sigmoid")
-            plt.plot(plot_data.index, y_pred, c="r", label="Expon neg")
-            plt.legend(loc="lower left")
-        else:
-            plt.plot(plot_data.index, y_pred, c="k")
+            plt.plot(plot_data.index, y_pred, c="k", linestyle="--", label="Sigmoid")
+            plt.plot(plot_data.index, exp_y_pred, c="r", linestyle="-.", label="Expon neg")
 
-        plt.scatter(plot_data.index, plot_data)
-        plt.loglog()
-        plt.xlabel(labels[0])
-        plt.ylabel(labels[1])
+        else:
+            plt.plot(plot_data.index, y_pred, c="k", linestyle="--", label="Fitted curve")
+
+        plt.scatter(plot_data.index, plot_data, color="blue", edgecolors="black", alpha=0.7, label="Data")
+        plt.xscale("log")
+        plt.yscale("log")
+        plt.xlabel(labels[0], fontsize=12)
+        plt.ylabel(labels[1], fontsize=12)
+        plt.legend(loc="lower left", frameon=True, fontsize=10)
+        plt.grid(True, which="both", linestyle="--", linewidth=0.5)
         plt.loglog()
         plt.savefig(
             os.path.join(
@@ -1140,13 +1154,16 @@ class Laws:
                 }
             )
 
-            self._add_pdf_cell(f"{func_name}")
+            func_name = func_name.replace('_',' ').split(' ')
+            func_name[0] = func_name[0].capitalize()
+            self.pdf_object.set_font("Arial", "B", size=9)
+            self._add_pdf_cell(f"{' '.join(func_name)}")
+            self.pdf_object.set_font("Arial", size=8)
             self._add_pdf_cell(
-                f'{best_fit} with params: {filtered_df[["param1", "param2"]]}'
+                f'Best fit: {best_fit} with Param 1: {filtered_df["param1"].values[0]}, Param 2: {filtered_df["param2"].values[0]}'
             )
             self._add_pdf_curves_table(param_frame)
-            self._add_pdf_plot(plot_obj, 160, 100)
-            self.pdf_object.add_page()
+            self._add_pdf_plot(plot_obj, 80, 50)
 
         return wrapper
 
@@ -1176,6 +1193,7 @@ class Laws:
                 self._add_pdf_cell(
                     f'Right distribution is {results[4][1].model["name"]} with params: {results[4][1].model["params"]}'
                 )
+                self._add_pdf_distribution_table(results[4][1].summary[["name", "score"]])
                 plot_distribution, plot_models = self._plot_double_distribution(
                     results[4][0],
                     results[4][1],
@@ -1216,6 +1234,23 @@ class Laws:
             if (
                 model.model["name"] not in const.DISTRIBUTIONS and data.shape[0] >= 4
             ):  # FIXME:
+                flexation_point_detection_results = Flexation().find_distributions(
+                    model, np.sort(data.values)
+                )
+                if flexation_point_detection_results != None:
+
+                    return (
+                        func.__name__,
+                        model,
+                        plot_distribution_obj,
+                        plot_model_obj,
+                        flexation_point_detection_results,
+                    )
+                else:
+                    return func.__name__, model, plot_distribution_obj, plot_model_obj
+            elif(
+                model.model["name"] == 'pareto' and model.model['params'][0] > 3
+            ):
                 flexation_point_detection_results = Flexation().find_distributions(
                     model, np.sort(data.values)
                 )
@@ -1488,8 +1523,9 @@ class ScalingLawsCalc:
 
         self.pdf.add_page()
         self.pdf.set_auto_page_break(auto=True, margin=15)
+        self.pdf.set_font("Arial", "B", size=12)
+        self.pdf.cell(200, 10, text=f"{self.animal_name.replace('_',' ')}", ln=True, align="C")
         self.pdf.set_font("Arial", size=9)
-        self.pdf.cell(200, 10, text=f"{self.animal_name}", ln=True, align="C")
 
     def _preprocess_data(self) -> TrajectoriesFrame:
         preproc = Prepocessing()
@@ -1578,6 +1614,7 @@ class ScalingLawsCalc:
         )
         laws.visitation_frequency(filtered_animals, min_label_no)
         laws.distinct_locations_over_time(filtered_animals, min_label_no)
+        self.pdf.add_page()
         laws.jump_lengths_distribution(filtered_animals)
         laws.waiting_times(filtered_animals)
         laws.msd_curve(filtered_animals, min_records)
