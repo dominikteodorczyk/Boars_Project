@@ -1249,7 +1249,24 @@ class Laws:
                 else:
                     return func.__name__, model, plot_distribution_obj, plot_model_obj
             elif(
-                model.model["name"] == 'pareto' and model.model['params'][0] > 3
+                model.model["name"] == 'pareto' and model.model['params'][0] > 2
+            ):
+                flexation_point_detection_results = Flexation().find_distributions(
+                    model, np.sort(data.values)
+                )
+                if flexation_point_detection_results != None:
+
+                    return (
+                        func.__name__,
+                        model,
+                        plot_distribution_obj,
+                        plot_model_obj,
+                        flexation_point_detection_results,
+                    )
+                else:
+                    return func.__name__, model, plot_distribution_obj, plot_model_obj
+            elif(
+                model.model["name"] == 'lognorm' and model.model['params'][0] > 2
             ):
                 flexation_point_detection_results = Flexation().find_distributions(
                     model, np.sort(data.values)
