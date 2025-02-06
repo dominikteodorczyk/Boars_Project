@@ -915,7 +915,8 @@ class Laws:
         plot_obj: BytesIO,
         image_width: int,
         image_height: int,
-        x_position: int = 10,
+        x_position: float = 10,
+        y_position:float = None
     ) -> None:
         """
         Add a plot to the PDF.
@@ -931,8 +932,12 @@ class Laws:
         x_position : int, optional
             X-coordinate position of the plot, by default 10.
         """
-        try:
+        if y_position== None:
             y_position = self.pdf_object.get_y()
+        else:
+            y_position=y_position
+
+        try:
             self.pdf_object.image(
                 plot_obj, x=x_position, y=y_position, w=image_width, h=image_height
             )
@@ -941,33 +946,39 @@ class Laws:
         except Exception as e:
             raise RuntimeError(f"Failed to add plot to PDF: {e}")
 
-    def _add_pdf_curves_table(self, data):
-        self.pdf_object.ln(5)  # Nowa linia
+    def _add_pdf_curves_table(self, data,x_offset=10,y_offset=None):
+        if y_offset== None:
+            y_offset = self.pdf_object.get_y()
+        else:
+            y_offset=y_offset
+        self.pdf_object.set_xy(x_offset, y_offset)
+         # Nowa linia
         # Mniejsza czcionka
-        self.pdf_object.set_font("Arial", size=8)
+        self.pdf_object.set_font("Arial", size=7)
 
         # Nagłówki tabeli (pogrubione)
-        self.pdf_object.set_font("Arial", style="B", size=8)
-        self.pdf_object.cell(25, 4, "Curve", border='TB', align="C")
-        self.pdf_object.cell(25, 4, "Weight", border='TB', align="C")
-        self.pdf_object.cell(25, 4, "Param 1", border='TB', align="C")
-        self.pdf_object.cell(25, 4, "Param 2", border='TB', align="C")
+        col_width = 25
+        self.pdf_object.set_font("Arial", style="B", size=7)
+        self.pdf_object.cell(col_width, 4, "Curve", border='TB', align="C")
+        self.pdf_object.cell(col_width, 4, "Weight", border='TB', align="C")
+        self.pdf_object.cell(col_width, 4, "Param 1", border='TB', align="C")
+        self.pdf_object.cell(col_width, 4, "Param 2", border='TB', align="C")
         self.pdf_object.ln()
 
         # Resetowanie czcionki do zwykłej
-        self.pdf_object.set_font("Arial", size=8)
+        self.pdf_object.set_font("Arial", size=7)
 
         # Wiersze tabeli
         for index, row in data.iterrows():
-            self.pdf_object.cell(25, 4, row["curve"], border=0, align="C")
-            self.pdf_object.cell(25, 4, str(round(row["weight"],10)), border=0, align="C")
-            self.pdf_object.cell(25, 4, str(round(row["param1"],10)), border=0, align="C")
-            self.pdf_object.cell(25, 4, str(round(row["param2"],10)), border=0, align="C")
+            self.pdf_object.cell(col_width, 4, row["curve"], border=0, align="C")
+            self.pdf_object.cell(col_width, 4, str(round(row["weight"],10)), border=0, align="C")
+            self.pdf_object.cell(col_width, 4, str(round(row["param1"],10)), border=0, align="C")
+            self.pdf_object.cell(col_width, 4, str(round(row["param2"],10)), border=0, align="C")
             self.pdf_object.ln()
 
         # Linia pod całą tabelą
-        self.pdf_object.cell(100, 0, "", border="T")
-        self.pdf_object.ln(5)  # Mały odstęp po tabeli
+        self.pdf_object.cell(col_width*4, 0, "", border="T")
+        self.pdf_object.ln(1)  # Mały odstęp po tabeli
 
     def _add_pdf_distribution_table(self, data):
         self.pdf_object.ln(10)  # Nowa linia
@@ -994,7 +1005,7 @@ class Laws:
         buffer = BytesIO()
 
         sns.set_style("whitegrid")
-        plt.figure(figsize=(8, 5))
+        plt.figure(figsize=(8, 4.5))
 
         if exp_y_pred is not None and exp_y_pred.size > 0:
             plt.plot(plot_data.index, y_pred, c="k", linestyle="--", label="Sigmoid")
@@ -1163,14 +1174,16 @@ class Laws:
 
             func_name = func_name.replace('_',' ').split(' ')
             func_name[0] = func_name[0].capitalize()
-            self.pdf_object.set_font("Arial", "B", size=9)
+            self.pdf_object.set_font("Arial", "B", size=8)
             self._add_pdf_cell(f"{' '.join(func_name)}")
-            self.pdf_object.set_font("Arial", size=8)
+            self.pdf_object.set_font("Arial", size=7)
             self._add_pdf_cell(
                 f'Best fit: {best_fit} with Param 1: {filtered_df["param1"].values[0]}, Param 2: {filtered_df["param2"].values[0]}'
             )
-            self._add_pdf_curves_table(param_frame)
-            self._add_pdf_plot(plot_obj, 80, 50)
+
+            y_position_global = float(self.pdf_object.get_y())
+            self._add_pdf_curves_table(param_frame,x_offset=10,y_offset=y_position_global+13)
+            self._add_pdf_plot(plot_obj=plot_obj,image_width=80, image_height=45, x_position= 125, y_position = y_position_global)
 
         return wrapper
 
@@ -1550,6 +1563,7 @@ class ScalingLawsCalc:
         self.pdf.set_font("Arial", "B", size=12)
         self.pdf.cell(200, 10, text=f"{self.animal_name.replace('_',' ')}", ln=True, align="C")
         self.pdf.set_font("Arial", size=9)
+        self.pdf.ln(5)
 
     def _preprocess_data(self) -> TrajectoriesFrame:
         preproc = Prepocessing()
@@ -1638,16 +1652,14 @@ class ScalingLawsCalc:
         )
         laws.visitation_frequency(filtered_animals, min_label_no)
         laws.distinct_locations_over_time(filtered_animals, min_label_no)
-        self.pdf.add_page()
-        laws.jump_lengths_distribution(filtered_animals)
-        laws.waiting_times(filtered_animals)
         laws.msd_curve(filtered_animals, min_records)
-        # laws.travel_times(filtered_animals)
-        # laws.rog(filtered_animals)
         laws.rog_over_time(filtered_animals, min_records)
         self.pdf.add_page()
+        laws.waiting_times(filtered_animals)
+        laws.jump_lengths_distribution(filtered_animals)
+        # laws.travel_times(filtered_animals)
+        # laws.rog(filtered_animals)
         laws.msd_distribution(filtered_animals)
-        # laws.msd_curve(filtered_animals, min_records)
         # laws.return_time_distribution(filtered_animals)
         # laws.exploration_time(filtered_animals)
 
