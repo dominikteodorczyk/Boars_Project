@@ -971,17 +971,24 @@ class Laws:
 
     def _add_pdf_distribution_table(self, data):
         self.pdf_object.ln(10)  # Nowa linia
-        self.pdf_object.cell(40, 5, "Distribution", border=1, align="C")
-        self.pdf_object.cell(40, 5, "Score", border=1, align="C")
+        self.pdf_object.set_font("Arial", style="B", size=8)
+        self.pdf_object.cell(20, 4, "Distribution", border='TB', align="C")
+        self.pdf_object.cell(50, 4, "Score", border='TB', align="C")
+        self.pdf_object.cell(100, 4, "Params", border='TB', align="C")
+        self.pdf_object.set_font("Arial", size=8)
         self.pdf_object.ln()
 
         for index, row in data.iterrows():
             try:
-                self.pdf_object.cell(40, 5, row["name"], border=1, align="C")
-                self.pdf_object.cell(40, 5, str(row["score"]), border=1, align="C")
+                self.pdf_object.cell(20, 4, row["name"], border=0, align="C")
+                self.pdf_object.cell(50, 4, str(round(row["score"],15)), border=0, align="C")
+                self.pdf_object.cell(100, 4, str(tuple(round(x, 5) for x in row["params"])).replace("(","").replace(")",""), border=0, align="C")
+                # self.pdf_object.cell(40, 5, str(row["params"]), border=1, align="C")
                 self.pdf_object.ln()
             except:
                 pass
+        self.pdf_object.cell(170, 0, "", border="T")
+        self.pdf_object.ln(5)  # Mały odstęp po tabeli
 
     def _plot_curve(self, func_name, plot_data, y_pred, labels, exp_y_pred=None):
         buffer = BytesIO()
@@ -1179,7 +1186,7 @@ class Laws:
             self._add_pdf_cell(
                 f'{results[1].model["name"]} with params: {results[1].model["params"]}'
             )
-            self._add_pdf_distribution_table(results[1].summary[["name", "score"]])
+            self._add_pdf_distribution_table(results[1].summary[["name", "score",'params']])
             self._add_pdf_plot(results[2], 100, 70)
             self._add_pdf_plot(results[3], 100, 70)
             self.pdf_object.add_page()
@@ -1193,7 +1200,7 @@ class Laws:
                 self._add_pdf_cell(
                     f'Right distribution is {results[4][1].model["name"]} with params: {results[4][1].model["params"]}'
                 )
-                self._add_pdf_distribution_table(results[4][1].summary[["name", "score"]])
+                self._add_pdf_distribution_table(results[4][1].summary[["name", "score",'params']])
                 plot_distribution, plot_models = self._plot_double_distribution(
                     results[4][0],
                     results[4][1],
@@ -1638,6 +1645,7 @@ class ScalingLawsCalc:
         # laws.travel_times(filtered_animals)
         # laws.rog(filtered_animals)
         laws.rog_over_time(filtered_animals, min_records)
+        self.pdf.add_page()
         laws.msd_distribution(filtered_animals)
         # laws.msd_curve(filtered_animals, min_records)
         # laws.return_time_distribution(filtered_animals)
