@@ -981,25 +981,25 @@ class Laws:
         self.pdf_object.ln(1)  # Mały odstęp po tabeli
 
     def _add_pdf_distribution_table(self, data):
-        self.pdf_object.ln(10)  # Nowa linia
-        self.pdf_object.set_font("Arial", style="B", size=8)
-        self.pdf_object.cell(20, 4, "Distribution", border='TB', align="C")
+        # self.pdf_object.ln(10)  # Nowa linia
+        self.pdf_object.set_font("Arial", style="B", size=7)
+        self.pdf_object.cell(35, 4, "Distribution", border='TB', align="C")
         self.pdf_object.cell(50, 4, "Score", border='TB', align="C")
         self.pdf_object.cell(100, 4, "Params", border='TB', align="C")
-        self.pdf_object.set_font("Arial", size=8)
+        self.pdf_object.set_font("Arial", size=7)
         self.pdf_object.ln()
 
         for index, row in data.iterrows():
             try:
-                self.pdf_object.cell(20, 4, row["name"], border=0, align="C")
+                self.pdf_object.cell(35, 4, row["name"], border=0, align="C")
                 self.pdf_object.cell(50, 4, str(round(row["score"],15)), border=0, align="C")
                 self.pdf_object.cell(100, 4, str(tuple(round(x, 5) for x in row["params"])).replace("(","").replace(")",""), border=0, align="C")
                 # self.pdf_object.cell(40, 5, str(row["params"]), border=1, align="C")
                 self.pdf_object.ln()
             except:
                 pass
-        self.pdf_object.cell(170, 0, "", border="T")
-        self.pdf_object.ln(5)  # Mały odstęp po tabeli
+        self.pdf_object.cell(185, 0, "", border="T")
+        self.pdf_object.ln(1)  # Mały odstęp po tabeli
 
     def _plot_curve(self, func_name, plot_data, y_pred, labels, exp_y_pred=None):
         buffer = BytesIO()
@@ -1014,7 +1014,7 @@ class Laws:
         else:
             plt.plot(plot_data.index, y_pred, c="k", linestyle="--", label="Fitted curve")
 
-        plt.scatter(plot_data.index, plot_data, color="blue", edgecolors="black", alpha=0.7, label="Data")
+        plt.scatter(plot_data.index, plot_data, color="darkturquoise", label="Data")
         plt.xscale("log")
         plt.yscale("log")
         plt.xlabel(labels[0], fontsize=12)
@@ -1042,8 +1042,8 @@ class Laws:
         )
 
         sns.set_style("whitegrid")
-        plt.figure(figsize=(12, 5))
-        plt.hist(values, bins=100, density=True)
+        plt.figure(figsize=(8, 6))
+        plt.hist(values, color='darkturquoise',bins=100, density=True)
         plt.xlabel(measure_type)
         plt.ylabel("Values")
         plt.loglog()
@@ -1058,13 +1058,13 @@ class Laws:
         plt.close()
         buffer_plot_distribution.seek(0)
 
-        plt.figure(figsize=(12, 5))
+        plt.figure(figsize=(8, 6))
         model.plot(
-            pdf_properties={"color": "#472D30", "linewidth": 4, "linestyle": "--"},
+            pdf_properties={"color": "black", "linewidth": 2, "linestyle": "--"},
             bar_properties=None,
             cii_properties=None,
-            emp_properties={"color": "#E26D5C", "linewidth": 0, "marker": "o"},
-            figsize=(8, 5),
+            emp_properties={"color": "darkturquoise","linewidth": 0, "marker": "o"},
+            figsize=(8, 6),
         )
         plt.xlabel(measure_type)
         plt.loglog()
@@ -1099,12 +1099,11 @@ class Laws:
 
         sns.set_style("whitegrid")
 
-        plt.figure(figsize=(12, 5))
+        plt.figure(figsize=(8, 6))
         plt.hist(
             left_values,
             bins=50,
             density=True,
-            alpha=0.5,
             label="Left Set",
             color="grey",
         )
@@ -1112,12 +1111,12 @@ class Laws:
             right_values,
             bins=50,
             density=True,
-            alpha=0.5,
             label="Right Set",
-            color="orange",
+            color="darkturquoise",
         )
         plt.loglog()
-
+        plt.xlabel(measure_type)
+        plt.ylabel("Values")
         plt.savefig(
             os.path.join(
                 self.output_path,
@@ -1129,19 +1128,19 @@ class Laws:
         buffer_plot_distribution.seek(0)
 
         left_model.plot(
-            pdf_properties={"color": "#472D30", "linewidth": 4, "linestyle": "--"},
+            pdf_properties={"color": "black", "linewidth": 2, "linestyle": "--"},
             bar_properties=None,
             cii_properties=None,
-            emp_properties={"color": "#E26D5C", "linewidth": 0, "marker": "o"},
-            figsize=(8, 5),
+            emp_properties={"color": "darkturquoise", "linewidth": 0, "marker": "o"},
+            figsize=(8, 6),
         )
 
         right_model.plot(
-            pdf_properties={"color": "#472D30", "linewidth": 4, "linestyle": "--"},
+            pdf_properties={"color": "black", "linewidth": 2, "linestyle": "--"},
             bar_properties=None,
             cii_properties=None,
-            emp_properties={"color": "#E26D5C", "linewidth": 0, "marker": "o"},
-            figsize=(8, 5),
+            emp_properties={"color": "darkturquoise", "linewidth": 0, "marker": "o"},
+            figsize=(8, 6),
         )
 
         plt.legend()
@@ -1195,14 +1194,21 @@ class Laws:
             self.stats_frame.add_data(
                 {f"{results[0]}_params": results[1].model["params"]}
             )
-            self._add_pdf_cell(f"{results[0]}")
+
+            func_name = results[0].replace('_',' ').split(' ')
+            func_name[0] = func_name[0].capitalize()
+            self.pdf_object.set_font("Arial", "B", size=8)
+            self._add_pdf_cell(f"{' '.join(func_name)}")
+            self.pdf_object.set_font("Arial", size=7)
             self._add_pdf_cell(
-                f'{results[1].model["name"]} with params: {results[1].model["params"]}'
+                f'Best fit: {results[1].model["name"]} with params: {results[1].model["params"]}'
             )
+
             self._add_pdf_distribution_table(results[1].summary[["name", "score",'params']])
-            self._add_pdf_plot(results[2], 100, 70)
-            self._add_pdf_plot(results[3], 100, 70)
-            self.pdf_object.add_page()
+            y_position_global = float(self.pdf_object.get_y())
+            self._add_pdf_plot(results[2], 80, 60,x_position= 10, y_position = y_position_global)
+            self._add_pdf_plot(results[3], 80, 60,x_position= 110, y_position = y_position_global)
+
             if len(results) == 5:
                 self._add_pdf_cell(
                     f"At point {results[4][4]}, the flexion point of the distributions was found"
@@ -1222,9 +1228,10 @@ class Laws:
                     results[4][4],
                     results[0],
                 )
-                self._add_pdf_plot(plot_distribution, 100, 70)
-                self._add_pdf_plot(plot_models, 100, 70)
-                self.pdf_object.add_page()
+                y_position_global = float(self.pdf_object.get_y())
+                self._add_pdf_plot(plot_distribution, 80, 60,x_position= 10, y_position = y_position_global)
+                self._add_pdf_plot(plot_models, 80, 60,x_position= 110, y_position = y_position_global)
+            self.pdf_object.add_page()
 
         return wrapper
 
