@@ -801,8 +801,8 @@ class Flexation:
             right_set = data[data >= point]
 
             if left_set.size >= 1 and right_set.size >= 3:  # FIXME:
-                left_model = distfit(stats="wasserstein")
-                right_model = distfit(stats="wasserstein")
+                left_model =distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
+                right_model =distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
 
                 left_model.fit_transform(left_set)
                 right_model.fit_transform(right_set)
@@ -883,8 +883,8 @@ class Flexation:
                 left_set = data[data <= best_point]
                 right_set = data[data >= best_point]
 
-                left_model = distfit(stats="wasserstein")
-                right_model = distfit(stats="wasserstein")
+                left_model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
+                right_model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
 
                 left_model.fit_transform(left_set)
                 right_model.fit_transform(right_set)
@@ -1358,7 +1358,7 @@ class Laws:
 
         # Fit to find the best theoretical distribution
         jl = jl[~jl.isna()]
-        model = distfit(stats="wasserstein")
+        model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
         model.fit_transform(jl.values)
 
         return model, jl
@@ -1378,7 +1378,7 @@ class Laws:
         wt = wt[wt != 0]
 
         # Fit to find the best theoretical distribution
-        model = distfit(stats="wasserstein")
+        model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
         model.fit_transform(wt.values)
 
         return model, wt
@@ -1402,7 +1402,7 @@ class Laws:
         tt = tt[~tt.isna()]
 
         # Fit to find the best theoretical distribution
-        model = distfit(stats="wasserstein")
+        model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
         model.fit_transform(tt.values)
 
         return model, tt
@@ -1413,7 +1413,7 @@ class Laws:
         rog = radius_of_gyration(data, time_evolution=False)
 
         # Fit to find the best theoretical distribution
-        model = distfit(stats="RSS")
+        model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
         model.fit_transform(rog.values)
 
         return model, rog
@@ -1444,7 +1444,7 @@ class Laws:
     def msd_distribution(self, data: TrajectoriesFrame) -> tuple:
         msd = mean_square_displacement(data, time_evolution=False, from_center=True)
         # Fit to find the best theoretical distribution
-        model = distfit(stats="wasserstein")
+        model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
         model.fit_transform(msd.values)
 
         return model, msd
