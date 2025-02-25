@@ -52,7 +52,7 @@ class Curves:
         array-like: Transformed values.
         """
         x = x.astype(float)
-        return a*x
+        return a * x
 
     @staticmethod
     def expon(x: np.ndarray, a: float, b: float) -> np.ndarray:
@@ -231,6 +231,14 @@ class Curves:
         array-like: Transformed values.
         """
         return 1 / (x + a) ** b
+
+    @staticmethod
+    def power_law(n, A, B):
+        """
+        Power-law function used to model the number of unique places
+        visited over time.
+        """
+        return A * n ** B
 
 
 class DistributionFitingTools:
@@ -958,22 +966,22 @@ class Laws:
 
         # Nagłówki tabeli (pogrubione)
         col_width = 25
-        self.pdf_object.set_font("Arial", style="B", size=7)
-        self.pdf_object.cell(col_width, 4, "Curve", border='TB', align="C")
-        self.pdf_object.cell(col_width, 4, "Weight", border='TB', align="C")
-        self.pdf_object.cell(col_width, 4, "Param 1", border='TB', align="C")
-        self.pdf_object.cell(col_width, 4, "Param 2", border='TB', align="C")
+        self.pdf_object.set_font("Arial", style="B", size=6)
+        self.pdf_object.cell(col_width, 3, "Curve", border='TB', align="C")
+        self.pdf_object.cell(col_width, 3, "Weight", border='TB', align="C")
+        self.pdf_object.cell(col_width, 3, "Param 1", border='TB', align="C")
+        self.pdf_object.cell(col_width, 3, "Param 2", border='TB', align="C")
         self.pdf_object.ln()
 
         # Resetowanie czcionki do zwykłej
-        self.pdf_object.set_font("Arial", size=7)
+        self.pdf_object.set_font("Arial", size=6)
 
         # Wiersze tabeli
         for index, row in data.iterrows():
-            self.pdf_object.cell(col_width, 4, row["curve"], border=0, align="C")
-            self.pdf_object.cell(col_width, 4, str(round(row["weight"],10)), border=0, align="C")
-            self.pdf_object.cell(col_width, 4, str(round(row["param1"],10)), border=0, align="C")
-            self.pdf_object.cell(col_width, 4, str(round(row["param2"],10)), border=0, align="C")
+            self.pdf_object.cell(col_width, 3, row["curve"], border=0, align="C")
+            self.pdf_object.cell(col_width, 3, str(round(row["weight"],10)), border=0, align="C")
+            self.pdf_object.cell(col_width, 3, str(round(row["param1"],10)), border=0, align="C")
+            self.pdf_object.cell(col_width, 3, str(round(row["param2"],10)), border=0, align="C")
             self.pdf_object.ln()
 
         # Linia pod całą tabelą
@@ -982,18 +990,18 @@ class Laws:
 
     def _add_pdf_distribution_table(self, data):
         # self.pdf_object.ln(10)  # Nowa linia
-        self.pdf_object.set_font("Arial", style="B", size=7)
-        self.pdf_object.cell(35, 4, "Distribution", border='TB', align="C")
-        self.pdf_object.cell(50, 4, "Score", border='TB', align="C")
-        self.pdf_object.cell(100, 4, "Params", border='TB', align="C")
-        self.pdf_object.set_font("Arial", size=7)
+        self.pdf_object.set_font("Arial", style="B", size=6)
+        self.pdf_object.cell(35, 3, "Distribution", border='TB', align="C")
+        self.pdf_object.cell(50, 3, "Score", border='TB', align="C")
+        self.pdf_object.cell(100, 3, "Params", border='TB', align="C")
+        self.pdf_object.set_font("Arial", size=6)
         self.pdf_object.ln()
 
         for index, row in data.iterrows():
             try:
-                self.pdf_object.cell(35, 4, row["name"], border=0, align="C")
-                self.pdf_object.cell(50, 4, str(round(row["score"],15)), border=0, align="C")
-                self.pdf_object.cell(100, 4, str(tuple(round(x, 5) for x in row["params"])).replace("(","").replace(")",""), border=0, align="C")
+                self.pdf_object.cell(35, 3, row["name"], border=0, align="C")
+                self.pdf_object.cell(50, 3, str(round(row["score"],15)), border=0, align="C")
+                self.pdf_object.cell(100, 3, str(tuple(round(x, 5) for x in row["params"])).replace("(","").replace(")",""), border=0, align="C")
                 # self.pdf_object.cell(40, 5, str(row["params"]), border=1, align="C")
                 self.pdf_object.ln()
             except:
