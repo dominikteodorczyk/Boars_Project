@@ -24,6 +24,7 @@ from math import log
 from scipy.stats import wasserstein_distance
 import ruptures as rpt
 
+
 sns.set_style("whitegrid")
 
 logging.basicConfig(
@@ -748,6 +749,21 @@ class Prepocessing:
                 ]
             )
 
+    @staticmethod
+    def longest_visited_row(groupa):
+        """
+        Returns the row where the individual spent the longest time in an interval.
+        """
+        if groupa.empty:
+            return pd.Series(dtype=object)  # Ensure an empty series is returned
+
+        max_label = groupa.groupby('labels')['duration'].sum().idxmax()  # Find label with longest total duration
+
+        # Select first row where this label appears
+        row = groupa[groupa['labels'] == max_label].iloc[0]
+
+        return row.T  # Return full row
+
 
 class Flexation:
 
@@ -960,11 +976,8 @@ class Laws:
         else:
             y_offset=y_offset
         self.pdf_object.set_xy(x_offset, y_offset)
-         # Nowa linia
-        # Mniejsza czcionka
-        self.pdf_object.set_font("Arial", size=7)
 
-        # Nagłówki tabeli (pogrubione)
+        self.pdf_object.set_font("Arial", size=7)
         col_width = 25
         self.pdf_object.set_font("Arial", style="B", size=6)
         self.pdf_object.cell(col_width, 3, "Curve", border='TB', align="C")
@@ -972,11 +985,8 @@ class Laws:
         self.pdf_object.cell(col_width, 3, "Param 1", border='TB', align="C")
         self.pdf_object.cell(col_width, 3, "Param 2", border='TB', align="C")
         self.pdf_object.ln()
-
-        # Resetowanie czcionki do zwykłej
         self.pdf_object.set_font("Arial", size=6)
 
-        # Wiersze tabeli
         for index, row in data.iterrows():
             self.pdf_object.cell(col_width, 3, row["curve"], border=0, align="C")
             self.pdf_object.cell(col_width, 3, str(round(row["weight"],10)), border=0, align="C")
@@ -984,12 +994,11 @@ class Laws:
             self.pdf_object.cell(col_width, 3, str(round(row["param2"],10)), border=0, align="C")
             self.pdf_object.ln()
 
-        # Linia pod całą tabelą
+
         self.pdf_object.cell(col_width*4, 0, "", border="T")
-        self.pdf_object.ln(1)  # Mały odstęp po tabeli
+        self.pdf_object.ln(1)
 
     def _add_pdf_distribution_table(self, data):
-        # self.pdf_object.ln(10)  # Nowa linia
         self.pdf_object.set_font("Arial", style="B", size=6)
         self.pdf_object.cell(35, 3, "Distribution", border='TB', align="C")
         self.pdf_object.cell(50, 3, "Score", border='TB', align="C")
@@ -1007,7 +1016,7 @@ class Laws:
             except:
                 pass
         self.pdf_object.cell(185, 0, "", border="T")
-        self.pdf_object.ln(1)  # Mały odstęp po tabeli
+        self.pdf_object.ln(1)
 
     def _plot_curve(self, func_name, plot_data, y_pred, labels, exp_y_pred=None):
         buffer = BytesIO()
@@ -1548,6 +1557,29 @@ class Laws:
 
         return model, et
 
+    def estimate_pnew(self, n_steps:np.ndarray, S_t:np.ndarray):
+        """
+        Estimate parameters (rho, gamma) for the new place probability
+        function P_new(S) = rho * S^(-gamma).
+
+        Parameters:
+            n_steps (array-like): Time step indices (or movement step indices).
+            S_t (array-like): Mean number of distinct places visited at each step.
+            plot (bool, optional): Whether to visualize the fit.
+
+        Returns:
+            rho_hat (float): Estimated rho parameter.
+            gamma_hat (float): Estimated gamma parameter.
+        """
+        # Fit power-law model to S(n) = A * n^B
+        popt, pcov = curve_fit(Curves.power_law, n_steps, S_t, p0=const.PNEW_P0)
+        A_fit, B_fit = popt
+
+        # Compute gamma and rho based on theoretical model
+        gamma_hat = 1.0 / B_fit - 1.0
+        rho_hat = (A_fit ** (gamma_hat + 1.0)) / (gamma_hat + 1.0)
+
+        return rho_hat, gamma_hat
 
 class ScalingLawsCalc:
 
