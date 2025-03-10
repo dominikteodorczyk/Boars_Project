@@ -1,4 +1,5 @@
 
+from typing_extensions import Buffer
 from numpy import ndarray
 import pandas as pd
 import os
@@ -1194,6 +1195,27 @@ class Laws:
         buffer_plot_model.seek(0)
         return buffer_plot_distribution, buffer_plot_model
 
+    def _plot_P_new(self, rho_hat,gamma_hat,nrows):
+        buffer = BytesIO()
+        sns.set_style("whitegrid")
+        plt.figure(figsize=(8, 4.5))
+        plt.plot(np.arange(1, nrows), [rho_hat * x ** (-gamma_hat) for x in range(1, nrows)], label="Estimated", color="darkturquoise")
+        plt.plot(np.arange(1, nrows), [0.6 * x ** (-0.21) for x in range(1, nrows)], label="Paper", color="black")
+        plt.legend()
+        plt.xlabel("Time steps (n)")
+        plt.ylabel("P_new (estimated vs. reference)")
+        plt.title("Comparison of Estimated vs. Paper Model")
+        plt.savefig(
+            os.path.join(
+                self.output_path,
+                "P new comparison of Estimated vs. Paper Model.png",
+            )
+        )
+        plt.savefig(buffer, format="png")
+        plt.close()
+        buffer.seek(0)
+        return buffer
+
     def log_curve_fitting_resluts(func):
         def wrapper(self, *args, **kwargs):
             func_name, best_fit, param_frame, plot_obj = func(self, *args, **kwargs)
@@ -1269,6 +1291,16 @@ class Laws:
                 self._add_pdf_plot(plot_distribution, 80, 60,x_position= 10, y_position = y_position_global)
                 self._add_pdf_plot(plot_models, 80, 60,x_position= 110, y_position = y_position_global)
             self.pdf_object.add_page()
+
+        return wrapper
+
+    def log_pnew_estimation(func):
+        def wrapper(self, *args, **kwargs):
+            rho_hat, gamma_hat, A_fit, B_fit, nrows = func(
+                self, *args, **kwargs
+            )  # type: ignore
+
+
 
         return wrapper
 
