@@ -1583,22 +1583,23 @@ class Laws:
     def dlot_split(self):
         pass
 
-    def estimate_pnew(self, n_steps:np.ndarray, S_t:np.ndarray):
+    def estimate_pnew(self, data:pd.DataFrame) -> tuple:
         """
         Estimate parameters (rho, gamma) for the new place probability
         function P_new(S) = rho * S^(-gamma).
 
         Parameters:
-            n_steps (array-like): Time step indices (or movement step indices).
-            S_t (array-like): Mean number of distinct places visited at each step.
-            plot (bool, optional): Whether to visualize the fit.
+
 
         Returns:
             rho_hat (float): Estimated rho parameter.
             gamma_hat (float): Estimated gamma parameter.
         """
+        nrows = int(data.groupby(level=0).apply(lambda x: len(x)).min())
+        n_data = np.arange(1, nrows + 1)
+        S_data = [data.groupby(level=0)['new_sum'].nth(x).mean() for x in range(nrows)]
         # Fit power-law model to S(n) = A * n^B
-        popt, pcov = curve_fit(Curves.power_law, n_steps, S_t, p0=const.PNEW_P0)
+        popt, pcov = curve_fit(Curves.power_law, n_data, S_data, p0=const.PNEW_P0)
         A_fit, B_fit = popt
 
         # Compute gamma and rho based on theoretical model
@@ -1747,6 +1748,7 @@ class ScalingLawsCalc:
         laws.msd_distribution(filtered_animals)
         # laws.return_time_distribution(filtered_animals)
         # laws.exploration_time(filtered_animals)
+        laws.estimate_pnew(filled_animals)
 
         pdf_path = os.path.join(self.output_dir_animal, f"{self.animal_name}.pdf")
         self.pdf.output(pdf_path)
