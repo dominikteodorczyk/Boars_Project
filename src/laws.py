@@ -750,20 +750,40 @@ class Prepocessing:
             )
 
     @staticmethod
-    def longest_visited_row(groupa):
-        """
-        Returns the row where the individual spent the longest time in an interval.
-        """
-        if groupa.empty:
-            return pd.Series(dtype=object)  # Ensure an empty series is returned
 
-        max_label = groupa.groupby('labels')['duration'].sum().idxmax()  # Find label with longest total duration
 
-        # Select first row where this label appears
-        row = groupa[groupa['labels'] == max_label].iloc[0]
+    @staticmethod
+    def filing_data(data:pd.DataFrame) -> pd.DataFrame:
 
-        return row.T  # Return full row
+        def longest_visited_row(groupa):
+            """
+            Returns the row where the individual spent the longest time in an interval.
+            """
+            if groupa.empty:
+                return pd.Series(dtype=object)
+            max_label = groupa.groupby('labels')['duration'].sum().idxmax()
+            row = groupa[groupa['labels'] == max_label].iloc[0]
 
+            return row.T
+
+        to_conca = {}
+        for uid, group in data.groupby(level=0):
+            print(group)
+            group = group[~group['datetime'].duplicated()]
+            if len(group.labels.unique()) < 2:
+                continue
+            group.set_index('datetime', inplace=True)
+            group['duration'] = (group.index.to_series().shift(-1) - group.index).dt.total_seconds()
+            group['duration'].fillna(3600, inplace=True)
+
+            group_resampled = group.resample('1H').apply(longest_visited_row).unstack()
+            if group_resampled.index.nlevels > 1:
+                group_resampled = group.resample('1H').apply(longest_visited_row)
+            group_resampled = group_resampled.resample('1H').first()
+            group_resampled = group_resampled.ffill().bfill()
+            to_conca[uid] = group_resampled
+
+        return pd.DataFrame(pd.concat(to_conca))
 
 class Flexation:
 
@@ -1557,6 +1577,12 @@ class Laws:
 
         return model, et
 
+    def msd_curve_split(self):
+        pass
+
+    def dlot_split(self):
+        pass
+
     def estimate_pnew(self, n_steps:np.ndarray, S_t:np.ndarray):
         """
         Estimate parameters (rho, gamma) for the new place probability
@@ -1671,12 +1697,24 @@ class ScalingLawsCalc:
         # FIXME: choose data for compressed csv and next step of calculations
         return filtered_animals
 
+    def _advenced_preprocessing(self):
+        preproc = Prepocessing()
+        data = self.data.reset_index().drop(columns=['Unnamed: 0']).drop_duplicates().set_index('user_id')
+        filled_data = preproc.filing_data(data)
+
+        filled_data['is_new'] = filled_data.groupby(level=0, group_keys=False).apply(lambda x: ~x.duplicated(keep='first'))
+        filled_data['new_sum'] = filled_data.groupby(level=0).apply(lambda x: x.is_new.cumsum()).droplevel(1)
+
+        return filled_data
+
     def process_file(self) -> None:
 
         self.stats_frame.add_data({"animal": self.animal_name})
 
         filtered_animals = self._preprocess_data()
         filtered_animals.to_csv(os.path.join(self.output_dir,f'compressed_{self.animal_name}.csv'))
+
+        filled_animals = self._advenced_preprocessing()
 
         min_label_no = [
             [value]
