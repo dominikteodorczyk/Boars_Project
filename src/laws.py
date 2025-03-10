@@ -751,9 +751,6 @@ class Prepocessing:
             )
 
     @staticmethod
-
-
-    @staticmethod
     def filing_data(data:pd.DataFrame) -> pd.DataFrame:
 
         def longest_visited_row(groupa):
@@ -769,7 +766,6 @@ class Prepocessing:
 
         to_conca = {}
         for uid, group in data.groupby(level=0):
-            print(group)
             group = group[~group['datetime'].duplicated()]
             if len(group.labels.unique()) < 2:
                 continue
@@ -1216,6 +1212,15 @@ class Laws:
         buffer.seek(0)
         return buffer
 
+    def _plot_MSD_split(self):
+        pass
+
+    def _plot_DLOT_split(self):
+        pass
+
+    def _plot_Ploglog(self):
+        pass
+
     def log_curve_fitting_resluts(func):
         def wrapper(self, *args, **kwargs):
             func_name, best_fit, param_frame, plot_obj = func(self, *args, **kwargs)
@@ -1299,8 +1304,21 @@ class Laws:
             rho_hat, gamma_hat, A_fit, B_fit, nrows = func(
                 self, *args, **kwargs
             )  # type: ignore
-
-
+            y_position_global = float(self.pdf_object.get_y())
+            self.pdf_object.set_font("Arial", "B", size=8)
+            self._add_pdf_cell("Pnew estimation")
+            self.pdf_object.set_font("Arial", size=7)
+            self._add_pdf_cell(
+                f"A_fit  = {A_fit:.4f} (paper: {const.A_FIT})")
+            self._add_pdf_cell(
+                f"B_fit  = {B_fit:.4f} (paper: {const.B_FIT})")
+            self.pdf_object.set_font("Arial", "B",size=7)
+            self._add_pdf_cell(
+                f"gamma  = {gamma_hat:.4f} (paper: {const.GAMMA})")
+            self._add_pdf_cell(
+                f"rho  = {rho_hat:.4f} (paper: {const.RHO})")
+            plot_obj = self._plot_P_new(rho_hat,gamma_hat,nrows)
+            self._add_pdf_plot(plot_obj=plot_obj,image_width=80, image_height=45, x_position= 125, y_position = y_position_global)
 
         return wrapper
 
@@ -1615,6 +1633,7 @@ class Laws:
     def dlot_split(self):
         pass
 
+    @log_pnew_estimation
     def estimate_pnew(self, data:pd.DataFrame) -> tuple:
         """
         Estimate parameters (rho, gamma) for the new place probability
@@ -1637,8 +1656,7 @@ class Laws:
         # Compute gamma and rho based on theoretical model
         gamma_hat = 1.0 / B_fit - 1.0
         rho_hat = (A_fit ** (gamma_hat + 1.0)) / (gamma_hat + 1.0)
-
-        return rho_hat, gamma_hat
+        return rho_hat, gamma_hat, A_fit, B_fit, nrows
 
 class ScalingLawsCalc:
 
