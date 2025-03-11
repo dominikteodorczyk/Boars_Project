@@ -1,5 +1,4 @@
 
-from typing_extensions import Buffer
 from numpy import ndarray
 import pandas as pd
 import os
@@ -15,7 +14,7 @@ import seaborn as sns
 import numpy as np
 from scipy.optimize import curve_fit
 from humobi.measures.individual import visitation_frequency, jump_lengths, distinct_locations_over_time, radius_of_gyration, mean_square_displacement, num_of_distinct_locations
-from humobi.tools.processing import rowwise_average, convert_to_distribution, start_end
+from humobi.tools.processing import rowwise_average, convert_to_distribution, start_end, groupwise_expansion
 from constans import const
 import scipy.stats as scp_stats
 from distfit import distfit
@@ -24,6 +23,8 @@ from io import BytesIO
 from math import log
 from scipy.stats import wasserstein_distance
 import ruptures as rpt
+import geopandas as gpd
+from shapely.geometry import Point
 
 
 sns.set_style("whitegrid")
@@ -1015,6 +1016,34 @@ class Laws:
         self.pdf_object.cell(col_width*4, 0, "", border="T")
         self.pdf_object.ln(1)
 
+    def _add_pdf_msd_split_table(self, data,x_offset=10,y_offset=None):
+        if y_offset== None:
+            y_offset = self.pdf_object.get_y()
+        else:
+            y_offset=y_offset
+        self.pdf_object.set_xy(x_offset, y_offset)
+
+        self.pdf_object.set_font("Arial", size=7)
+        col_width = 25
+        self.pdf_object.set_font("Arial", style="B", size=6)
+        self.pdf_object.cell(col_width, 3, "RoG range [km]", border='TB', align="C")
+        self.pdf_object.cell(col_width, 3, "Curve", border='TB', align="C")
+        self.pdf_object.cell(col_width, 3, "Param 1", border='TB', align="C")
+        self.pdf_object.cell(col_width, 3, "Param 2", border='TB', align="C")
+        self.pdf_object.ln()
+        self.pdf_object.set_font("Arial", size=6)
+
+        for index, row in data.iterrows():
+            self.pdf_object.cell(col_width, 3, row["RoG range [km]"], border=0, align="C")
+            self.pdf_object.cell(col_width, 3, row["curve"], border=0, align="C")
+            self.pdf_object.cell(col_width, 3, str(round(row["param1"],10)), border=0, align="C")
+            self.pdf_object.cell(col_width, 3, str(round(row["param2"],10)), border=0, align="C")
+            self.pdf_object.ln()
+
+
+        self.pdf_object.cell(col_width*4, 0, "", border="T")
+        self.pdf_object.ln(1)
+
     def _add_pdf_distribution_table(self, data):
         self.pdf_object.set_font("Arial", style="B", size=6)
         self.pdf_object.cell(35, 3, "Distribution", border='TB', align="C")
@@ -1212,12 +1241,6 @@ class Laws:
         buffer.seek(0)
         return buffer
 
-    def _plot_MSD_split(self):
-        pass
-
-    def _plot_DLOT_split(self):
-        pass
-
     def _plot_Ploglog(self):
         pass
 
@@ -1320,6 +1343,20 @@ class Laws:
             self._add_pdf_cell(
                 f"rho  = {rho_hat:.4f} (paper: {const.RHO})")
             plot_obj = self._plot_P_new(rho_hat,gamma_hat,nrows)
+            self._add_pdf_plot(plot_obj=plot_obj,image_width=80, image_height=45, x_position= 110, y_position = y_position_global)
+
+        return wrapper
+
+    def log_msd_split(func):
+        def wrapper(self, *args, **kwargs):
+            msd_results, plot_obj = func(
+                self, *args, **kwargs
+            )  # type: ignore
+            self.pdf_object.set_font("Arial", "B", size=8)
+            self._add_pdf_cell("MSD split")
+            y_position_global = float(self.pdf_object.get_y())
+            self.pdf_object.ln(4)
+            self._add_pdf_msd_split_table(msd_results)
             self._add_pdf_plot(plot_obj=plot_obj,image_width=80, image_height=45, x_position= 110, y_position = y_position_global)
 
         return wrapper
@@ -1629,9 +1666,63 @@ class Laws:
 
         return model, et
 
+    @log_msd_split
     def msd_curve_split(self, data):
+        gdf = gpd.GeoDataFrame(data, geometry=gpd.points_from_xy(data['lon'], data['lat']))
+        gdf.crs = 4326
+        gdf = gdf.to_crs(3857)
+        com = gdf.groupby(level=0).apply(lambda z: Point(z.geometry.x.mean(), z.geometry.y.mean())) # type: ignore
+        starting_points = gdf.groupby(level=0).head(1).droplevel(1).geometry
+        to_concat_msd = []
+        to_concat_rog = {}
+        for ind, vals in gdf.groupby(level=0):
+            vals['is_new'] = ~vals.labels.duplicated(keep='first')
+            vals = vals[vals['is_new']]
+            vals = vals.dropna()[1:]
+            msd_ind = vals.distance(starting_points.loc[ind]) ** 2 # type: ignore
+            rog_ind = vals.distance(com.loc[ind]) ** 2 # type: ignore
+            msd_ind = groupwise_expansion(msd_ind)
+            to_concat_msd.append(msd_ind)
+            to_concat_rog[ind] = np.sqrt(rog_ind).mean()
+        final_msd = pd.concat(to_concat_msd)
+        final_rog = pd.DataFrame.from_dict(to_concat_rog, orient='index')
+        final_rog['bins'] = pd.cut(final_rog.values.ravel(), bins=[0,2e3,4e3,8e3,16e3, 32e3, 64e3, 128e3, 256e3, 512e3, 1024e3])
+        msd_results = pd.DataFrame(columns=['RoG range [km]','curve','param1','param2'])
+        buffer = BytesIO()
+        sns.set_style("whitegrid")
+        plt.figure(figsize=(8, 4.5))
+        for ind, vals in final_rog.groupby('bins'):
+            if vals.empty:
+                continue
+            msd_pick = final_msd.loc[vals.index.values]
+            msd_rows = int(msd_pick.groupby(level=0).apply(lambda x: len(x)).median())
+            msd_pick = rowwise_average(msd_pick, msd_rows)
+            msd_chosen = DistributionFitingTools().model_choose(msd_pick)
+            msd_results = msd_results._append({
+                'RoG range [km]':f'{(int(ind.left/1000))}-{(int(ind.right/1000))}',
+                'curve':msd_chosen[1],
+                'param1':msd_chosen[2][0],
+                'param2':msd_chosen[2][1]# type: ignore
+                },
+                ignore_index=True
+                )
+            plt.scatter(np.arange(msd_rows), msd_pick.values)
+            plt.plot(np.arange(msd_pick.shape[0]), msd_chosen[0], label=f'RoG:<{(int(ind.right/1000))}km') # type: ignore
 
-        pass
+        plt.legend()
+        plt.loglog()
+        plt.xlabel("t")
+        plt.ylabel("MSD")
+        plt.savefig(
+            os.path.join(
+                self.output_path,
+                "MSD split.png",
+            )
+        )
+        plt.savefig(buffer, format="png")
+        plt.close()
+        buffer.seek(0)
+        return msd_results, buffer
 
     @log_curve_fitting_resluts
     @check_curve_fit
@@ -1800,7 +1891,8 @@ class ScalingLawsCalc:
         laws.visitation_frequency(filtered_animals, min_label_no)
         laws.distinct_locations_over_time_split(filled_animals)
         # laws.distinct_locations_over_time(filtered_animals, min_label_no)
-        laws.msd_curve(filtered_animals, min_records)
+        laws.msd_curve_split(filled_animals)
+        # laws.msd_curve(filtered_animals, min_records)
         laws.rog_over_time(filtered_animals, min_records)
         self.pdf.add_page()
         laws.waiting_times(filtered_animals)
