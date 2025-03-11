@@ -1304,9 +1304,11 @@ class Laws:
             rho_hat, gamma_hat, A_fit, B_fit, nrows = func(
                 self, *args, **kwargs
             )  # type: ignore
-            y_position_global = float(self.pdf_object.get_y())
             self.pdf_object.set_font("Arial", "B", size=8)
             self._add_pdf_cell("Pnew estimation")
+            y_position_global = float(self.pdf_object.get_y())
+            self.pdf_object.ln()
+            self.pdf_object.ln()
             self.pdf_object.set_font("Arial", size=7)
             self._add_pdf_cell(
                 f"A_fit  = {A_fit:.4f} (paper: {const.A_FIT})")
@@ -1318,7 +1320,7 @@ class Laws:
             self._add_pdf_cell(
                 f"rho  = {rho_hat:.4f} (paper: {const.RHO})")
             plot_obj = self._plot_P_new(rho_hat,gamma_hat,nrows)
-            self._add_pdf_plot(plot_obj=plot_obj,image_width=80, image_height=45, x_position= 125, y_position = y_position_global)
+            self._add_pdf_plot(plot_obj=plot_obj,image_width=80, image_height=45, x_position= 110, y_position = y_position_global)
 
         return wrapper
 
@@ -1627,11 +1629,20 @@ class Laws:
 
         return model, et
 
-    def msd_curve_split(self):
+    def msd_curve_split(self, data):
+
         pass
 
-    def dlot_split(self):
-        pass
+    @log_curve_fitting_resluts
+    @check_curve_fit
+    def distinct_locations_over_time_split(self, data):
+        nrows = int(data.groupby(level=0).apply(lambda x: len(x)).min())
+        n_data = np.arange(1, nrows + 1)
+        S_data = [data.groupby(level=0)['new_sum'].nth(x).mean() for x in range(nrows)]
+        y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
+            DistributionFitingTools().model_choose(pd.Series(S_data))
+        )
+        return best_fit, global_params, y_pred, expon_y_pred, pd.Series(S_data), ["t","S(t)"]
 
     @log_pnew_estimation
     def estimate_pnew(self, data:pd.DataFrame) -> tuple:
@@ -1787,7 +1798,8 @@ class ScalingLawsCalc:
             output_path=self.output_dir_animal,
         )
         laws.visitation_frequency(filtered_animals, min_label_no)
-        laws.distinct_locations_over_time(filtered_animals, min_label_no)
+        laws.distinct_locations_over_time_split(filled_animals)
+        # laws.distinct_locations_over_time(filtered_animals, min_label_no)
         laws.msd_curve(filtered_animals, min_records)
         laws.rog_over_time(filtered_animals, min_records)
         self.pdf.add_page()
