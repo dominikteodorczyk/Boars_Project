@@ -34,3 +34,11 @@ MIN_QUARTILE_VALUE = 3
 CURVE = {'linear','expon','expon_neg'}
 DISTRIBUTIONS = {'lognorm','expon','pareto','norm','truncexpon','truncnorm','truncpareto','powerlaw'}
 FLEXATION_POINTS_SENSITIVITY = 'Medium'
+
+## Pnew estimation
+PNEW_P0 = [1.0, 0.5]
+# reference values from literature (if applicable)
+A_FIT = 0.5
+B_FIT = 0.825
+GAMMA = 0.6
+RHO = 0.21
