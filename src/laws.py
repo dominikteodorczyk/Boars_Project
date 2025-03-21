@@ -25,6 +25,8 @@ from scipy.stats import wasserstein_distance
 import ruptures as rpt
 import geopandas as gpd
 from shapely.geometry import Point
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
 
 
 sns.set_style("whitegrid")
@@ -755,33 +757,48 @@ class Prepocessing:
     def filing_data(data:pd.DataFrame) -> pd.DataFrame:
 
         def longest_visited_row(groupa):
-            """
-            Returns the row where the individual spent the longest time in an interval.
-            """
+            """ Returns the row where the individual spent the longest time in an interval. """
             if groupa.empty:
-                return pd.Series(dtype=object)
-            max_label = groupa.groupby('labels')['duration'].sum().idxmax()
+                return pd.Series(dtype=object)  # Ensure an empty series is returned
+
+            max_label = groupa.groupby('labels')['duration'].sum().idxmax()  # Find label with longest total duration
+
+            # Select first row where this label appears
             row = groupa[groupa['labels'] == max_label].iloc[0]
 
-            return row.T
+            return row.T  # Return full row
 
         to_conca = {}
+
+        # Process each individual separately
         for uid, group in data.groupby(level=0):
-            group = group[~group['datetime'].duplicated()]
+            group = group[~group['datetime'].duplicated()]  # Remove duplicate timestamps within the same individual
             if len(group.labels.unique()) < 2:
                 continue
-            group.set_index('datetime', inplace=True)
+            group.set_index('datetime', inplace=True)  # Set time as the index for time-based operations
             group['duration'] = (group.index.to_series().shift(-1) - group.index).dt.total_seconds()
+            group['next'] = group.labels != group.labels.shift()
+            group['moved'] = group.next.cumsum()
+            (group.groupby('moved').duration.sum() / 3600).describe()
             group['duration'].fillna(3600, inplace=True)
 
             group_resampled = group.resample('1H').apply(longest_visited_row).unstack()
             if group_resampled.index.nlevels > 1:
                 group_resampled = group.resample('1H').apply(longest_visited_row)
             group_resampled = group_resampled.resample('1H').first()
+            # Fill missing data using forward-fill and backward-fill
             group_resampled = group_resampled.ffill().bfill()
+
+            # Store processed data for concatenation
             to_conca[uid] = group_resampled
 
-        return pd.DataFrame(pd.concat(to_conca))
+        df = pd.DataFrame(pd.concat(to_conca))
+        # Identify when a new place is visited for each individual
+        df['is_new'] = df.groupby(level=0, group_keys=False).apply(lambda x: ~x.labels.duplicated(keep='first'))
+
+        # Compute cumulative number of distinct places visited (S(t)) for each individual
+        df['new_sum'] = df.groupby(level=0).apply(lambda x: x.is_new.cumsum()).droplevel(1)
+        return df
 
 class Flexation:
 
@@ -1220,12 +1237,13 @@ class Laws:
         buffer_plot_model.seek(0)
         return buffer_plot_distribution, buffer_plot_model
 
-    def _plot_P_new(self, rho_hat,gamma_hat,nrows):
-        buffer = BytesIO()
+    def _plot_P_new(self,rho_est, gamma_est, DeltaS, S_mid, intercept, slope, nrows, n_data):
+
+        buffer1 = BytesIO()
         sns.set_style("whitegrid")
         plt.figure(figsize=(8, 4.5))
-        plt.plot(np.arange(1, nrows), [rho_hat * x ** (-gamma_hat) for x in range(1, nrows)], label="Estimated", color="darkturquoise")
-        plt.plot(np.arange(1, nrows), [0.6 * x ** (-0.21) for x in range(1, nrows)], label="Paper", color="black")
+        plt.plot(np.arange(1, nrows), [rho_est * x ** (-gamma_est) for x in range(1, nrows)], label="Estimated",color='darkturquoise')
+        plt.plot(np.arange(1, nrows), [0.6 * x ** (-0.21) for x in range(1, nrows)], label="Paper", color='black')
         plt.legend()
         plt.xlabel("Time steps (n)")
         plt.ylabel("P_new (estimated vs. reference)")
@@ -1236,10 +1254,33 @@ class Laws:
                 "P new comparison of Estimated vs. Paper Model.png",
             )
         )
-        plt.savefig(buffer, format="png")
+        plt.savefig(buffer1, format="png")
         plt.close()
-        buffer.seek(0)
-        return buffer
+        buffer1.seek(0)
+
+
+        buffer2 = BytesIO()
+        sns.set_style("whitegrid")
+        plt.figure(figsize=(8, 4.5))
+        plt.plot(np.log(S_mid), np.log(DeltaS), 'o', label='Data (log-log)',color='darkturquoise')
+        X_line = np.linspace(np.log(min(S_mid)), np.log(max(S_mid)), 100)
+        y_line = intercept + slope * X_line
+        plt.plot(X_line, y_line, '--', label='Fit', color='black')
+        plt.xlabel('ln(S)')
+        plt.ylabel('ln(ΔS)')
+        plt.title('log(ΔS) vs. log(S)')
+        plt.legend()
+        plt.savefig(
+            os.path.join(
+                self.output_path,
+                "P_loglog.png",
+            )
+        )
+        plt.savefig(buffer2, format="png")
+        plt.close()
+        buffer2.seek(0)
+
+        return buffer1, buffer2
 
     def _plot_Ploglog(self):
         pass
@@ -1324,26 +1365,23 @@ class Laws:
 
     def log_pnew_estimation(func):
         def wrapper(self, *args, **kwargs):
-            rho_hat, gamma_hat, A_fit, B_fit, nrows = func(
+            rho_est, gamma_est, DeltaS, S_mid, intercept, slope, nrows, n_data = func(
                 self, *args, **kwargs
             )  # type: ignore
             self.pdf_object.set_font("Arial", "B", size=8)
             self._add_pdf_cell("Pnew estimation")
-            y_position_global = float(self.pdf_object.get_y())
+
             self.pdf_object.ln()
             self.pdf_object.ln()
             self.pdf_object.set_font("Arial", size=7)
             self._add_pdf_cell(
-                f"A_fit  = {A_fit:.4f} (paper: {const.A_FIT})")
+                f"gamma  = {gamma_est:.4f}")
             self._add_pdf_cell(
-                f"B_fit  = {B_fit:.4f} (paper: {const.B_FIT})")
-            self.pdf_object.set_font("Arial", "B",size=7)
-            self._add_pdf_cell(
-                f"gamma  = {gamma_hat:.4f} (paper: {const.GAMMA})")
-            self._add_pdf_cell(
-                f"rho  = {rho_hat:.4f} (paper: {const.RHO})")
-            plot_obj = self._plot_P_new(rho_hat,gamma_hat,nrows)
-            self._add_pdf_plot(plot_obj=plot_obj,image_width=80, image_height=45, x_position= 110, y_position = y_position_global)
+                f"rho  = {rho_est:.4f}")
+            y_position_global = float(self.pdf_object.get_y())
+            plot_obj1, plot_obj2 = self._plot_P_new(rho_est, gamma_est, DeltaS, S_mid, intercept, slope, nrows, n_data)
+            self._add_pdf_plot(plot_obj=plot_obj1,image_width=80, image_height=45, x_position= 10, y_position = y_position_global)
+            self._add_pdf_plot(plot_obj=plot_obj2,image_width=80, image_height=45, x_position= 110, y_position = y_position_global)
 
         return wrapper
 
@@ -1357,7 +1395,7 @@ class Laws:
             y_position_global = float(self.pdf_object.get_y())
             self.pdf_object.ln(4)
             self._add_pdf_msd_split_table(msd_results)
-            self._add_pdf_plot(plot_obj=plot_obj,image_width=80, image_height=45, x_position= 110, y_position = y_position_global)
+            self._add_pdf_plot(plot_obj=plot_obj,image_width=80, image_height=45, x_position= 125, y_position = y_position_global)
 
         return wrapper
 
@@ -1502,6 +1540,7 @@ class Laws:
 
         wt = wt[~wt.isna()]  # type: ignore
         wt = wt[wt != 0]
+        wt.to_csv('wt_data_aroma.csv')
 
         # Fit to find the best theoretical distribution
         model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
@@ -1668,25 +1707,28 @@ class Laws:
 
     @log_msd_split
     def msd_curve_split(self, data):
-        gdf = gpd.GeoDataFrame(data, geometry=gpd.points_from_xy(data['lon'], data['lat']))
+        gdf = gpd.GeoDataFrame(data, geometry=gpd.points_from_xy(data['lon'], data['lat']))  # convert GoeDataFrame
         gdf.crs = 4326
-        gdf = gdf.to_crs(3857)
-        com = gdf.groupby(level=0).apply(lambda z: Point(z.geometry.x.mean(), z.geometry.y.mean())) # type: ignore
-        starting_points = gdf.groupby(level=0).head(1).droplevel(1).geometry
+        gdf = gdf.to_crs(3857)  # transform
+        com = gdf.groupby(level=0).apply(lambda z: Point(z.geometry.x.mean(), z.geometry.y.mean()))  # center of mass
+        starting_points = gdf.groupby(level=0).head(1).droplevel(1).geometry  # first point of each
         to_concat_msd = []
         to_concat_rog = {}
         for ind, vals in gdf.groupby(level=0):
-            vals['is_new'] = ~vals.labels.duplicated(keep='first')
-            vals = vals[vals['is_new']]
-            vals = vals.dropna()[1:]
-            msd_ind = vals.distance(starting_points.loc[ind]) ** 2 # type: ignore
-            rog_ind = vals.distance(com.loc[ind]) ** 2 # type: ignore
-            msd_ind = groupwise_expansion(msd_ind)
+            vals['is_new'] = ~vals.labels.duplicated(keep='first')  # only when explores
+            vals = vals[vals['is_new']]  # filter explorations
+            vals = vals.dropna()[1:]  # skip the first position
+            msd_ind = vals.distance(starting_points.loc[ind]) ** 2  # MSD
+            rog_ind = vals.distance(com.loc[ind]) ** 2  # RoG
+            msd_ind = groupwise_expansion(msd_ind)  # expanding mean
             to_concat_msd.append(msd_ind)
             to_concat_rog[ind] = np.sqrt(rog_ind).mean()
-        final_msd = pd.concat(to_concat_msd)
-        final_rog = pd.DataFrame.from_dict(to_concat_rog, orient='index')
-        final_rog['bins'] = pd.cut(final_rog.values.ravel(), bins=[0,2e3,4e3,8e3,16e3, 32e3, 64e3, 128e3, 256e3, 512e3, 1024e3])
+        final_msd = pd.concat(to_concat_msd)  # gather into nice DF
+        final_rog = pd.DataFrame.from_dict(to_concat_rog, orient='index')  # the same for RoG
+        # Okay, so that one is according to the paper, we group trajectories based on the RoG and then estimate MSD
+        # curves for each of these groups separately
+        final_rog['bins'] = pd.cut(final_rog.values.ravel(),
+                                   bins=[0, 2e3, 4e3, 8e3, 16e3, 32e3, 64e3, 128e3, 256e3, 512e3, 1024e3])
         msd_results = pd.DataFrame(columns=['RoG range [km]','curve','param1','param2'])
         buffer = BytesIO()
         sns.set_style("whitegrid")
@@ -1694,10 +1736,22 @@ class Laws:
         for ind, vals in final_rog.groupby('bins'):
             if vals.empty:
                 continue
+            if vals.shape[0] < 2:
+                continue
             msd_pick = final_msd.loc[vals.index.values]
-            msd_rows = int(msd_pick.groupby(level=0).apply(lambda x: len(x)).median())
-            msd_pick = rowwise_average(msd_pick, msd_rows)
-            msd_chosen = DistributionFitingTools().model_choose(msd_pick)
+            msd_rows = int(msd_pick.groupby(level=0).apply(lambda x: len(x)).min())  # find min number of rows for
+            # individuals
+            msd_pick_avg = rowwise_average(msd_pick, msd_rows)
+            print(ind,vals.shape[0])
+            try:  # now average rowwise
+                msd_chosen = DistributionFitingTools().model_choose(msd_pick_avg)  # pick model
+            except ValueError:
+                continue
+            if len(msd_chosen[0]) < 3:
+                continue
+            avg_error = r2_score(np.log(msd_pick_avg[1:]), np.log(msd_chosen[0][1:]))
+            if avg_error < .25:
+                continue
             msd_results = msd_results._append({
                 'RoG range [km]':f'{(int(ind.left/1000))}-{(int(ind.right/1000))}',
                 'curve':msd_chosen[1],
@@ -1706,8 +1760,8 @@ class Laws:
                 },
                 ignore_index=True
                 )
-            plt.scatter(np.arange(msd_rows), msd_pick.values)
-            plt.plot(np.arange(msd_pick.shape[0]), msd_chosen[0], label=f'RoG:<{(int(ind.right/1000))}km') # type: ignore
+            plt.scatter(np.arange(msd_rows), msd_pick_avg.values)
+            plt.plot(np.arange(msd_pick_avg.shape[0]), msd_chosen[0], label=f'RoG:<{(int(ind.right/1000))}km ()') # type: ignore
 
         plt.legend()
         plt.loglog()
@@ -1726,17 +1780,14 @@ class Laws:
 
     @log_curve_fitting_resluts
     @check_curve_fit
-    def distinct_locations_over_time_split(self, data):
-        nrows = int(data.groupby(level=0).apply(lambda x: len(x)).min())
-        n_data = np.arange(1, nrows + 1)
-        S_data = [data.groupby(level=0)['new_sum'].nth(x).mean() for x in range(nrows)]
+    def distinct_locations_over_time_split(self, nrows, n_data, data):
         y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
-            DistributionFitingTools().model_choose(pd.Series(S_data))
+            DistributionFitingTools().model_choose(pd.Series(data))
         )
-        return best_fit, global_params, y_pred, expon_y_pred, pd.Series(S_data), ["t","S(t)"]
+        return best_fit, global_params, y_pred, expon_y_pred, pd.Series(data), ["t","S(t)"]
 
     @log_pnew_estimation
-    def estimate_pnew(self, data:pd.DataFrame) -> tuple:
+    def estimate_pnew(self, nrows, n_data, S_t) -> tuple:
         """
         Estimate parameters (rho, gamma) for the new place probability
         function P_new(S) = rho * S^(-gamma).
@@ -1748,17 +1799,26 @@ class Laws:
             rho_hat (float): Estimated rho parameter.
             gamma_hat (float): Estimated gamma parameter.
         """
-        nrows = int(data.groupby(level=0).apply(lambda x: len(x)).min())
-        n_data = np.arange(1, nrows + 1)
-        S_data = [data.groupby(level=0)['new_sum'].nth(x).mean() for x in range(nrows)]
-        # Fit power-law model to S(n) = A * n^B
-        popt, pcov = curve_fit(Curves.power_law, n_data, S_data, p0=const.PNEW_P0)
-        A_fit, B_fit = popt
 
-        # Compute gamma and rho based on theoretical model
-        gamma_hat = 1.0 / B_fit - 1.0
-        rho_hat = (A_fit ** (gamma_hat + 1.0)) / (gamma_hat + 1.0)
-        return rho_hat, gamma_hat, A_fit, B_fit, nrows
+        S_t = np.array(S_t)
+        DeltaS = S_t[1:] - S_t[:-1]
+        S_mid = S_t[:-1]
+        mask = (DeltaS > 0) & (S_mid > 0)
+        DeltaS = DeltaS[mask]
+        S_mid = S_mid[mask]
+
+        X = np.log(S_mid).reshape(-1, 1)  # predictor
+        y = np.log(DeltaS)  # response
+
+        model = LinearRegression()
+        model.fit(X, y)
+
+        slope = model.coef_[0]
+        intercept = model.intercept_
+        gamma_est = -slope
+        rho_est = np.exp(intercept)
+
+        return rho_est, gamma_est, DeltaS, S_mid, intercept, slope, nrows, n_data
 
 class ScalingLawsCalc:
 
@@ -1794,13 +1854,10 @@ class ScalingLawsCalc:
     def _preprocess_data(self) -> TrajectoriesFrame:
         preproc = Prepocessing()
         stats = Stats()
-
         mean_points_values = preproc.get_mean_points(self.data)
         compressed_points = preproc.set_start_stop_time(mean_points_values)
-
         converted_to_cartesian = preproc.set_crs(compressed_points)
         filtered_animals = preproc.filter_by_quartiles(converted_to_cartesian)
-
         self.stats_frame.add_data({"animal_no": stats.get_animals_no(self.data)})
         self.stats_frame.add_data(
             {"animal_after_filtration": stats.get_animals_no(filtered_animals)}
@@ -1852,13 +1909,15 @@ class ScalingLawsCalc:
 
     def _advenced_preprocessing(self):
         preproc = Prepocessing()
-        data = self.data.reset_index().drop(columns=['Unnamed: 0']).drop_duplicates().set_index('user_id')
+        filtrated_data = preproc.filter_by_quartiles(self.data)
+        data = filtrated_data.reset_index().drop(columns=['Unnamed: 0','geometry']).drop_duplicates().set_index('user_id')
         filled_data = preproc.filing_data(data)
+        filled_data.to_csv('dominik_test.csv')
 
-        filled_data['is_new'] = filled_data.groupby(level=0, group_keys=False).apply(lambda x: ~x.duplicated(keep='first'))
-        filled_data['new_sum'] = filled_data.groupby(level=0).apply(lambda x: x.is_new.cumsum()).droplevel(1)
-
-        return filled_data
+        nrows = int(filled_data.groupby(level=0).apply(lambda x: len(x)).min())
+        n_data = np.arange(1, nrows + 1)
+        S_data = [filled_data.groupby(level=0)['new_sum'].nth(x).mean() for x in range(nrows)]
+        return filled_data, nrows, n_data, S_data
 
     def process_file(self) -> None:
 
@@ -1866,8 +1925,7 @@ class ScalingLawsCalc:
 
         filtered_animals = self._preprocess_data()
         filtered_animals.to_csv(os.path.join(self.output_dir,f'compressed_{self.animal_name}.csv'))
-
-        filled_animals = self._advenced_preprocessing()
+        filled_data, nrows, n_data, S_data = self._advenced_preprocessing()
 
         min_label_no = [
             [value]
@@ -1889,9 +1947,9 @@ class ScalingLawsCalc:
             output_path=self.output_dir_animal,
         )
         laws.visitation_frequency(filtered_animals, min_label_no)
-        laws.distinct_locations_over_time_split(filled_animals)
+        laws.distinct_locations_over_time_split(nrows, n_data, S_data)
         # laws.distinct_locations_over_time(filtered_animals, min_label_no)
-        laws.msd_curve_split(filled_animals)
+        laws.msd_curve_split(filled_data)
         # laws.msd_curve(filtered_animals, min_records)
         laws.rog_over_time(filtered_animals, min_records)
         self.pdf.add_page()
@@ -1902,7 +1960,7 @@ class ScalingLawsCalc:
         laws.msd_distribution(filtered_animals)
         # laws.return_time_distribution(filtered_animals)
         # laws.exploration_time(filtered_animals)
-        laws.estimate_pnew(filled_animals)
+        laws.estimate_pnew(nrows, n_data, S_data)
 
         pdf_path = os.path.join(self.output_dir_animal, f"{self.animal_name}.pdf")
         self.pdf.output(pdf_path)
