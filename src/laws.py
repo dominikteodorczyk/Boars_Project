@@ -1,5 +1,5 @@
 
-from numpy import ndarray
+from numpy import ndarray, std
 import pandas as pd
 import os
 import logging
@@ -479,6 +479,41 @@ class Stats:
         return unique_label_counts[unique_label_counts == min_unique_label_count]
 
     @staticmethod
+    def get_mean_labels_no_after_filtration(data: TrajectoriesFrame) -> int:
+        """
+        Get the users mean number of unique labels
+        after filtration.
+
+        Args:
+            data (TrajectoriesFrame): Input data with 'user_id'
+                and 'labels' columns.
+
+        Returns:
+            int: Users mean no. unique label count.
+        """
+        unique_label_counts = data.groupby("user_id")["labels"].nunique()
+        mean_unique_label_count = int(unique_label_counts.mean())
+        return mean_unique_label_count
+
+
+    @staticmethod
+    def get_std_labels_no_after_filtration(data: TrajectoriesFrame) -> int:
+        """
+        Get the users std of unique labels
+        after filtration.
+
+        Args:
+            data (TrajectoriesFrame): Input data with 'user_id'
+                and 'labels' columns.
+
+        Returns:
+            int: Users mean no. unique label count.
+        """
+        unique_label_counts = data.groupby("user_id")["labels"].nunique()
+        std_unique_label_count = int(unique_label_counts.std())
+        return std_unique_label_count
+
+    @staticmethod
     def get_min_records_no_before_filtration(data: TrajectoriesFrame) -> pd.Series:
         """
         Get the animals with the minimum number of records
@@ -494,6 +529,40 @@ class Stats:
         records_counts = data.reset_index().groupby("user_id").datetime.count()
         min_label_count = records_counts.min()
         return records_counts[records_counts == min_label_count]
+
+    @staticmethod
+    def get_mean_records_no_before_filtration(data: TrajectoriesFrame) -> int:
+        """
+        Get the mean number of records
+        before filtration.
+
+        Args:
+            data (TrajectoriesFrame): Input data with 'animal_id'
+                and 'time' columns.
+
+        Returns:
+            int: mean number of records.
+        """
+        records_counts = data.reset_index().groupby("user_id").datetime.count()
+        mean_label_count = int(records_counts.mean())
+        return mean_label_count
+
+    @staticmethod
+    def get_std_records_no_before_filtration(data: TrajectoriesFrame) -> int:
+        """
+        Get the mean number of records
+        before filtration.
+
+        Args:
+            data (TrajectoriesFrame): Input data with 'animal_id'
+                and 'time' columns.
+
+        Returns:
+            int: mean number of records.
+        """
+        records_counts = data.reset_index().groupby("user_id").datetime.count()
+        std_label_count = int(records_counts.std())
+        return std_label_count
 
     @staticmethod
     def get_mean_periods(data: TrajectoriesFrame) -> pd.Timedelta:
@@ -537,6 +606,20 @@ class Stats:
             float: The maximum period in days.
         """
         return (data.groupby("user_id")["end"].max() - data.groupby("user_id")["start"].min()).max()  # type: ignore
+
+    @staticmethod
+    def get_std_periods(data: TrajectoriesFrame) -> pd.Timedelta:
+        """
+        Get the std of period between start and end times.
+
+        Args:
+            data (TrajectoriesFrame): Input data with 'start'
+                and 'end' columns.
+
+        Returns:
+            float: The std period in days.
+        """
+        return (data.groupby("user_id")["end"].max() - data.groupby("user_id")["start"].min()).std()  # type: ignore
 
     @staticmethod
     def get_overall_area(data: TrajectoriesFrame) -> float:
@@ -607,6 +690,23 @@ class Stats:
             areas.append(convex_hull.area / 10000)
         return round(max(areas), 0)
 
+    @staticmethod
+    def get_std_area(data: TrajectoriesFrame) -> float:
+        """
+        Get the std of area covered by trajectories per user.
+
+        Args:
+            data (TrajectoriesFrame): Input data.
+
+        Returns:
+            float: The std of area in hectares.
+        """
+        grouped = data.copy().groupby("user_id")
+        areas = []
+        for user_id, group in grouped:
+            convex_hull = group.unary_union.convex_hull
+            areas.append(convex_hull.area / 10000)
+        return round(std(areas), 0) # type: ignore
 
 class DataSetStats:
 
@@ -620,14 +720,20 @@ class DataSetStats:
                 "animal_after_filtration",
                 "time_period",
                 "min_label_no",
+                "mean_label_no",
+                "std_label_no",
                 "min_records",
+                "mean_records",
+                "std_records",
                 "avg_duration",
+                "std_duration",
                 "min_duration",
                 "max_duration",
                 "overall_set_area",
                 "average_set_area",
                 "min_area",
                 "max_area",
+                "std_area",
                 "visitation_frequency",
                 "visitation_frequency_params",
                 "distinct_locations_over_time",
@@ -638,18 +744,20 @@ class DataSetStats:
                 "waiting_times_params",
                 "msd_curve",
                 "msd_curve_params",
-                "travel_times",
-                "travel_times_params",
-                "rog",
-                "rog_params",
+                # "travel_times",
+                # "travel_times_params",
+                # "rog",
+                # "rog_params",
                 "rog_over_time",
                 "rog_over_time_params",
                 "msd_distribution",
                 "msd_distribution_params",
-                "return_time_distribution",
-                "return_time_distribution_params",
-                "exploration_time",
-                "exploration_time_params",
+                # "return_time_distribution",
+                # "return_time_distribution_params",
+                # "exploration_time",
+                # "exploration_time_params",
+                "rho",
+                "gamma"
             ]
         )
 
@@ -1368,6 +1476,10 @@ class Laws:
             rho_est, gamma_est, DeltaS, S_mid, intercept, slope, nrows, n_data = func(
                 self, *args, **kwargs
             )  # type: ignore
+
+            self.stats_frame.add_data({'rho': rho_est})
+            self.stats_frame.add_data({'gamma': gamma_est})
+
             self.pdf_object.set_font("Arial", "B", size=8)
             self._add_pdf_cell("Pnew estimation")
 
@@ -1390,6 +1502,16 @@ class Laws:
             msd_results, plot_obj = func(
                 self, *args, **kwargs
             )  # type: ignore
+            msd_curve = "; ".join(msd_results['RoG range [km]'] + ": " + msd_results['curve'])
+            msd_curve_params = "; ".join(msd_results['RoG range [km]'] + "(" + msd_results['curve'] + ")" + ":" + msd_results['param1'].astype(str) + "," + msd_results['param2'].astype(str))
+
+            self.stats_frame.add_data({'msd_curve': msd_curve})
+            self.stats_frame.add_data(
+                {
+                    "msd_curve_params": msd_curve_params
+                }
+            )
+
             self.pdf_object.set_font("Arial", "B", size=8)
             self._add_pdf_cell("MSD split")
             y_position_global = float(self.pdf_object.get_y())
@@ -1495,23 +1617,23 @@ class Laws:
 
         return best_fit, global_params, y_pred, expon_y_pred, avg_vf, ["Rank","f"]
 
-    @log_curve_fitting_resluts
-    @check_curve_fit
-    def distinct_locations_over_time(
-        self, data: TrajectoriesFrame, min_labels_no: int
-    ) -> tuple:
+    # @log_curve_fitting_resluts
+    # @check_curve_fit
+    # def distinct_locations_over_time(
+    #     self, data: TrajectoriesFrame, min_labels_no: int
+    # ) -> tuple:
 
-        dlot = distinct_locations_over_time(data,reaggregate = True, resolution = '1H')
-        avg_dlot = rowwise_average(dlot, row_count=min_labels_no)
-        avg_dlot.index += 1
-        dlot.groupby(level=0).size().median()
-        avg_dlot = avg_dlot[~avg_dlot.isna()]
+    #     dlot = distinct_locations_over_time(data,reaggregate = True, resolution = '1H')
+    #     avg_dlot = rowwise_average(dlot, row_count=min_labels_no)
+    #     avg_dlot.index += 1
+    #     dlot.groupby(level=0).size().median()
+    #     avg_dlot = avg_dlot[~avg_dlot.isna()]
 
-        y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
-            DistributionFitingTools().model_choose(avg_dlot)
-        )
+    #     y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
+    #         DistributionFitingTools().model_choose(avg_dlot)
+    #     )
 
-        return best_fit, global_params, y_pred, expon_y_pred, avg_dlot, ["t","S(t)"]
+    #     return best_fit, global_params, y_pred, expon_y_pred, avg_dlot, ["t","S(t)"]
 
     @log_distribution_fitting_resluts
     @check_distribution_fit
@@ -1540,7 +1662,7 @@ class Laws:
 
         wt = wt[~wt.isna()]  # type: ignore
         wt = wt[wt != 0]
-        wt.to_csv('wt_data_aroma.csv')
+
 
         # Fit to find the best theoretical distribution
         model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
@@ -1742,7 +1864,6 @@ class Laws:
             msd_rows = int(msd_pick.groupby(level=0).apply(lambda x: len(x)).min())  # find min number of rows for
             # individuals
             msd_pick_avg = rowwise_average(msd_pick, msd_rows)
-            print(ind,vals.shape[0])
             try:  # now average rowwise
                 msd_chosen = DistributionFitingTools().model_choose(msd_pick_avg)  # pick model
             except ValueError:
@@ -1761,7 +1882,7 @@ class Laws:
                 ignore_index=True
                 )
             plt.scatter(np.arange(msd_rows), msd_pick_avg.values)
-            plt.plot(np.arange(msd_pick_avg.shape[0]), msd_chosen[0], label=f'RoG:<{(int(ind.right/1000))}km ()') # type: ignore
+            plt.plot(np.arange(msd_pick_avg.shape[0]), msd_chosen[0], label=f'RoG:<{(int(ind.right/1000))}km ({vals.shape[0]})') # type: ignore
 
         plt.legend()
         plt.loglog()
@@ -1780,7 +1901,7 @@ class Laws:
 
     @log_curve_fitting_resluts
     @check_curve_fit
-    def distinct_locations_over_time_split(self, nrows, n_data, data):
+    def distinct_locations_over_time(self, nrows, n_data, data):
         y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
             DistributionFitingTools().model_choose(pd.Series(data))
         )
@@ -1904,6 +2025,13 @@ class ScalingLawsCalc:
         self.stats_frame.add_data({"min_area": stats.get_min_area(filtered_animals)})
         self.stats_frame.add_data({"max_area": stats.get_max_area(filtered_animals)})
 
+        self.stats_frame.add_data({"mean_label_no": stats.get_mean_labels_no_after_filtration(filtered_animals)})
+        self.stats_frame.add_data({"std_label_no": stats.get_std_labels_no_after_filtration(filtered_animals)})
+        self.stats_frame.add_data({"mean_records": stats.get_mean_records_no_before_filtration(self.data)})
+        self.stats_frame.add_data({"std_records": stats.get_std_records_no_before_filtration(self.data)})
+        self.stats_frame.add_data({"std_duration": stats.get_std_periods(filtered_animals)})
+        self.stats_frame.add_data({"std_area": stats.get_std_area(filtered_animals)})
+
         # FIXME: choose data for compressed csv and next step of calculations
         return filtered_animals
 
@@ -1912,7 +2040,6 @@ class ScalingLawsCalc:
         filtrated_data = preproc.filter_by_quartiles(self.data)
         data = filtrated_data.reset_index().drop(columns=['Unnamed: 0','geometry']).drop_duplicates().set_index('user_id')
         filled_data = preproc.filing_data(data)
-        filled_data.to_csv('dominik_test.csv')
 
         nrows = int(filled_data.groupby(level=0).apply(lambda x: len(x)).min())
         n_data = np.arange(1, nrows + 1)
@@ -1947,7 +2074,7 @@ class ScalingLawsCalc:
             output_path=self.output_dir_animal,
         )
         laws.visitation_frequency(filtered_animals, min_label_no)
-        laws.distinct_locations_over_time_split(nrows, n_data, S_data)
+        laws.distinct_locations_over_time(nrows, n_data, S_data)
         # laws.distinct_locations_over_time(filtered_animals, min_label_no)
         laws.msd_curve_split(filled_data)
         # laws.msd_curve(filtered_animals, min_records)
