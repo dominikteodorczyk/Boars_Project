@@ -496,6 +496,24 @@ class Stats:
         return records_counts[records_counts == min_label_count]
 
     @staticmethod
+    def get_mean_records_no_before_filtration(data: TrajectoriesFrame) -> int:
+        """
+        Get the mean number of records
+        before filtration.
+
+        Args:
+            data (TrajectoriesFrame): Input data with 'animal_id'
+                and 'time' columns.
+
+        Returns:
+            int: mean number of records.
+        """
+        records_counts = data.reset_index().groupby("user_id").datetime.count()
+        mean_label_count = int(records_counts.mean())
+        return mean_label_count
+
+
+    @staticmethod
     def get_mean_periods(data: TrajectoriesFrame) -> pd.Timedelta:
         """
         Get the mean period between start and end times.
@@ -537,6 +555,20 @@ class Stats:
             float: The maximum period in days.
         """
         return (data.groupby("user_id")["end"].max() - data.groupby("user_id")["start"].min()).max()  # type: ignore
+
+    @staticmethod
+    def get_std_periods(data: TrajectoriesFrame) -> pd.Timedelta:
+        """
+        Get the std of period between start and end times.
+
+        Args:
+            data (TrajectoriesFrame): Input data with 'start'
+                and 'end' columns.
+
+        Returns:
+            float: The std period in days.
+        """
+        return (data.groupby("user_id")["end"].max() - data.groupby("user_id")["start"].min()).std()  # type: ignore
 
     @staticmethod
     def get_overall_area(data: TrajectoriesFrame) -> float:
