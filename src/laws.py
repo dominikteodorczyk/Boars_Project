@@ -1,4 +1,3 @@
-
 from numpy import ndarray, std
 import pandas as pd
 import os
@@ -9,12 +8,25 @@ import scipy.stats
 from fpdf import FPDF
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 import seaborn as sns
 import numpy as np
 from scipy.optimize import curve_fit
-from humobi.measures.individual import visitation_frequency, jump_lengths, distinct_locations_over_time, radius_of_gyration, mean_square_displacement, num_of_distinct_locations
-from humobi.tools.processing import rowwise_average, convert_to_distribution, start_end, groupwise_expansion
+from humobi.measures.individual import (
+    visitation_frequency,
+    jump_lengths,
+    distinct_locations_over_time,
+    radius_of_gyration,
+    mean_square_displacement,
+    num_of_distinct_locations,
+)
+from humobi.tools.processing import (
+    rowwise_average,
+    convert_to_distribution,
+    start_end,
+    groupwise_expansion,
+)
 from constans import const
 import scipy.stats as scp_stats
 from distfit import distfit
@@ -243,7 +255,7 @@ class Curves:
         Power-law function used to model the number of unique places
         visited over time.
         """
-        return A * n ** B
+        return A * n**B
 
 
 class DistributionFitingTools:
@@ -390,7 +402,11 @@ class DistributionFitingTools:
         waicc = {k: np.exp(-0.5 * v) for k, v in waicc.items()}
         waicc = {k: v / np.sum(list(waicc.values())) for k, v in waicc.items()}
 
-        global_params = pd.DataFrame(columns=["curve", "weight", "param1", "param2"])
+        global_params = pd.DataFrame(
+            columns=[
+                "curve", "weight", "param1", "param2"
+                ]
+            )
         for (key1, value1), (key2, value2) in zip(waicc.items(), parameters.items()):
             if key1 == key2:
                 global_params = global_params._append(
@@ -495,7 +511,6 @@ class Stats:
         mean_unique_label_count = int(unique_label_counts.mean())
         return mean_unique_label_count
 
-
     @staticmethod
     def get_std_labels_no_after_filtration(data: TrajectoriesFrame) -> int:
         """
@@ -510,8 +525,10 @@ class Stats:
             int: Users mean no. unique label count.
         """
         unique_label_counts = data.groupby("user_id")["labels"].nunique()
-        std_unique_label_count = int(unique_label_counts.std())
-        return std_unique_label_count
+        try:
+            return int(unique_label_counts.std())  # type: ignore
+        except:
+            return 0  # type: ignore
 
     @staticmethod
     def get_min_records_no_before_filtration(data: TrajectoriesFrame) -> pd.Series:
@@ -561,8 +578,10 @@ class Stats:
             int: mean number of records.
         """
         records_counts = data.reset_index().groupby("user_id").datetime.count()
-        std_label_count = int(records_counts.std())
-        return std_label_count
+        try:
+            return int(records_counts.std())  # type: ignore
+        except:
+            return 0  # type: ignore
 
     @staticmethod
     def get_mean_periods(data: TrajectoriesFrame) -> pd.Timedelta:
@@ -619,7 +638,11 @@ class Stats:
         Returns:
             float: The std period in days.
         """
-        return (data.groupby("user_id")["end"].max() - data.groupby("user_id")["start"].min()).std()  # type: ignore
+
+        try:
+            return (data.groupby("user_id")["end"].max() - data.groupby("user_id")["start"].min()).std()  # type: ignore
+        except:
+            return 0  # type: ignore
 
     @staticmethod
     def get_overall_area(data: TrajectoriesFrame) -> float:
@@ -706,7 +729,11 @@ class Stats:
         for user_id, group in grouped:
             convex_hull = group.unary_union.convex_hull
             areas.append(convex_hull.area / 10000)
-        return round(std(areas), 0) # type: ignore
+        try:
+            return round(std(areas), 0)
+        except:
+            return 0
+
 
 class DataSetStats:
 
@@ -757,7 +784,7 @@ class DataSetStats:
                 # "exploration_time",
                 # "exploration_time_params",
                 "rho",
-                "gamma"
+                "gamma",
             ]
         )
 
@@ -765,7 +792,12 @@ class DataSetStats:
         self.record.update(data)
 
     def add_record(self) -> None:
-        self.stats_set = pd.concat([self.stats_set, pd.DataFrame([self.record])], ignore_index=True)  # type: ignore
+        self.stats_set = pd.concat(
+            [
+                self.stats_set,
+                pd.DataFrame([self.record])
+            ],
+            ignore_index=True)  # type: ignore
         self.record = {}
 
 
@@ -795,13 +827,24 @@ class Prepocessing:
                     ignore_index=True,
                 )  # type: ignore
 
-        return TrajectoriesFrame(geometry_df.sort_values("datetime").drop_duplicates())
+        return TrajectoriesFrame(
+            geometry_df.sort_values("datetime").drop_duplicates()
+            )
 
     @staticmethod
     def set_start_stop_time(data: TrajectoriesFrame) -> TrajectoriesFrame:
         compressed = pd.DataFrame(
             start_end(data).reset_index()[
-                ["user_id", "datetime", "labels", "lat", "lon", "date", "start", "end"]
+                [
+                    "user_id",
+                    "datetime",
+                    "labels", ""
+                    "lat",
+                    "lon",
+                    "date",
+                    "start",
+                    "end"
+                ]
             ]
         )
         return TrajectoriesFrame(
@@ -862,17 +905,22 @@ class Prepocessing:
             )
 
     @staticmethod
-    def filing_data(data:pd.DataFrame) -> pd.DataFrame:
+    def filing_data(data: pd.DataFrame) -> pd.DataFrame:
 
         def longest_visited_row(groupa):
-            """ Returns the row where the individual spent the longest time in an interval. """
+            """
+            Returns the row where the individual spent the longest
+            time in an interval.
+            """
             if groupa.empty:
                 return pd.Series(dtype=object)  # Ensure an empty series is returned
 
-            max_label = groupa.groupby('labels')['duration'].sum().idxmax()  # Find label with longest total duration
+            max_label = (
+                groupa.groupby("labels")["duration"].sum().idxmax()
+            )  # Find label with longest total duration
 
             # Select first row where this label appears
-            row = groupa[groupa['labels'] == max_label].iloc[0]
+            row = groupa[groupa["labels"] == max_label].iloc[0]
 
             return row.T  # Return full row
 
@@ -880,20 +928,26 @@ class Prepocessing:
 
         # Process each individual separately
         for uid, group in data.groupby(level=0):
-            group = group[~group['datetime'].duplicated()]  # Remove duplicate timestamps within the same individual
+            group = group[
+                ~group["datetime"].duplicated()
+            ]  # Remove duplicate timestamps within the same individual
             if len(group.labels.unique()) < 2:
                 continue
-            group.set_index('datetime', inplace=True)  # Set time as the index for time-based operations
-            group['duration'] = (group.index.to_series().shift(-1) - group.index).dt.total_seconds()
-            group['next'] = group.labels != group.labels.shift()
-            group['moved'] = group.next.cumsum()
-            (group.groupby('moved').duration.sum() / 3600).describe()
-            group['duration'].fillna(3600, inplace=True)
+            group.set_index(
+                "datetime", inplace=True
+            )  # Set time as the index for time-based operations
+            group["duration"] = (
+                group.index.to_series().shift(-1) - group.index
+            ).dt.total_seconds()
+            group["next"] = group.labels != group.labels.shift()
+            group["moved"] = group.next.cumsum()
+            (group.groupby("moved").duration.sum() / 3600).describe()
+            group["duration"].fillna(3600, inplace=True)
 
-            group_resampled = group.resample('1H').apply(longest_visited_row).unstack()
+            group_resampled = group.resample("1H").apply(longest_visited_row).unstack()
             if group_resampled.index.nlevels > 1:
-                group_resampled = group.resample('1H').apply(longest_visited_row)
-            group_resampled = group_resampled.resample('1H').first()
+                group_resampled = group.resample("1H").apply(longest_visited_row)
+            group_resampled = group_resampled.resample("1H").first()
             # Fill missing data using forward-fill and backward-fill
             group_resampled = group_resampled.ffill().bfill()
 
@@ -902,11 +956,16 @@ class Prepocessing:
 
         df = pd.DataFrame(pd.concat(to_conca))
         # Identify when a new place is visited for each individual
-        df['is_new'] = df.groupby(level=0, group_keys=False).apply(lambda x: ~x.labels.duplicated(keep='first'))
+        df["is_new"] = df.groupby(level=0, group_keys=False).apply(
+            lambda x: ~x.labels.duplicated(keep="first")
+        )
 
         # Compute cumulative number of distinct places visited (S(t)) for each individual
-        df['new_sum'] = df.groupby(level=0).apply(lambda x: x.is_new.cumsum()).droplevel(1)
+        df["new_sum"] = (
+            df.groupby(level=0).apply(lambda x: x.is_new.cumsum()).droplevel(1)
+        )
         return df
+
 
 class Flexation:
 
@@ -949,7 +1008,12 @@ class Flexation:
 
         return wasserstein_distance(empiric_density, model_density)
 
-    def _fit_mixed_models(self, data: ndarray, flexation_points: list) -> pd.DataFrame:
+    def _fit_mixed_models(
+            self,
+            data: ndarray,
+            flexation_points: list
+        ) -> pd.DataFrame:
+
         fitting_results = pd.DataFrame(
             columns=[
                 "point",
@@ -968,8 +1032,46 @@ class Flexation:
             right_set = data[data >= point]
 
             if left_set.size >= 1 and right_set.size >= 3:  # FIXME:
-                left_model =distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
-                right_model =distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
+                left_model = distfit(
+                    distr=[
+                        "norm",
+                        "expon",
+                        "pareto",
+                        "dweibull",
+                        "t",
+                        "genextreme",
+                        "gamma",
+                        "lognorm",
+                        "beta",
+                        "uniform",
+                        "loggamma",
+                        "truncexpon",
+                        "truncnorm",
+                        "truncpareto",
+                        "powerlaw",
+                    ],
+                    stats="wasserstein",
+                )
+                right_model = distfit(
+                    distr=[
+                        "norm",
+                        "expon",
+                        "pareto",
+                        "dweibull",
+                        "t",
+                        "genextreme",
+                        "gamma",
+                        "lognorm",
+                        "beta",
+                        "uniform",
+                        "loggamma",
+                        "truncexpon",
+                        "truncnorm",
+                        "truncpareto",
+                        "powerlaw",
+                    ],
+                    stats="wasserstein",
+                )
 
                 left_model.fit_transform(left_set)
                 right_model.fit_transform(right_set)
@@ -1050,8 +1152,46 @@ class Flexation:
                 left_set = data[data <= best_point]
                 right_set = data[data >= best_point]
 
-                left_model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
-                right_model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
+                left_model = distfit(
+                    distr=[
+                        "norm",
+                        "expon",
+                        "pareto",
+                        "dweibull",
+                        "t",
+                        "genextreme",
+                        "gamma",
+                        "lognorm",
+                        "beta",
+                        "uniform",
+                        "loggamma",
+                        "truncexpon",
+                        "truncnorm",
+                        "truncpareto",
+                        "powerlaw",
+                    ],
+                    stats="wasserstein",
+                )
+                right_model = distfit(
+                    distr=[
+                        "norm",
+                        "expon",
+                        "pareto",
+                        "dweibull",
+                        "t",
+                        "genextreme",
+                        "gamma",
+                        "lognorm",
+                        "beta",
+                        "uniform",
+                        "loggamma",
+                        "truncexpon",
+                        "truncnorm",
+                        "truncpareto",
+                        "powerlaw",
+                    ],
+                    stats="wasserstein",
+                )
 
                 left_model.fit_transform(left_set)
                 right_model.fit_transform(right_set)
@@ -1083,7 +1223,7 @@ class Laws:
         image_width: int,
         image_height: int,
         x_position: float = 10,
-        y_position:float = None
+        y_position: float = None,
     ) -> None:
         """
         Add a plot to the PDF.
@@ -1099,10 +1239,10 @@ class Laws:
         x_position : int, optional
             X-coordinate position of the plot, by default 10.
         """
-        if y_position== None:
+        if y_position == None:
             y_position = self.pdf_object.get_y()
         else:
-            y_position=y_position
+            y_position = y_position
 
         try:
             self.pdf_object.image(
@@ -1113,75 +1253,95 @@ class Laws:
         except Exception as e:
             raise RuntimeError(f"Failed to add plot to PDF: {e}")
 
-    def _add_pdf_curves_table(self, data,x_offset=10,y_offset=None):
-        if y_offset== None:
+    def _add_pdf_curves_table(self, data, x_offset=10, y_offset=None):
+        if y_offset == None:
             y_offset = self.pdf_object.get_y()
         else:
-            y_offset=y_offset
+            y_offset = y_offset
         self.pdf_object.set_xy(x_offset, y_offset)
 
         self.pdf_object.set_font("Arial", size=7)
         col_width = 25
         self.pdf_object.set_font("Arial", style="B", size=6)
-        self.pdf_object.cell(col_width, 3, "Curve", border='TB', align="C")
-        self.pdf_object.cell(col_width, 3, "Weight", border='TB', align="C")
-        self.pdf_object.cell(col_width, 3, "Param 1", border='TB', align="C")
-        self.pdf_object.cell(col_width, 3, "Param 2", border='TB', align="C")
+        self.pdf_object.cell(col_width, 3, "Curve", border="TB", align="C")
+        self.pdf_object.cell(col_width, 3, "Weight", border="TB", align="C")
+        self.pdf_object.cell(col_width, 3, "Param 1", border="TB", align="C")
+        self.pdf_object.cell(col_width, 3, "Param 2", border="TB", align="C")
         self.pdf_object.ln()
         self.pdf_object.set_font("Arial", size=6)
 
         for index, row in data.iterrows():
             self.pdf_object.cell(col_width, 3, row["curve"], border=0, align="C")
-            self.pdf_object.cell(col_width, 3, str(round(row["weight"],10)), border=0, align="C")
-            self.pdf_object.cell(col_width, 3, str(round(row["param1"],10)), border=0, align="C")
-            self.pdf_object.cell(col_width, 3, str(round(row["param2"],10)), border=0, align="C")
+            self.pdf_object.cell(
+                col_width, 3, str(round(row["weight"], 10)), border=0, align="C"
+            )
+            self.pdf_object.cell(
+                col_width, 3, str(round(row["param1"], 10)), border=0, align="C"
+            )
+            self.pdf_object.cell(
+                col_width, 3, str(round(row["param2"], 10)), border=0, align="C"
+            )
             self.pdf_object.ln()
 
-
-        self.pdf_object.cell(col_width*4, 0, "", border="T")
+        self.pdf_object.cell(col_width * 4, 0, "", border="T")
         self.pdf_object.ln(1)
 
-    def _add_pdf_msd_split_table(self, data,x_offset=10,y_offset=None):
-        if y_offset== None:
+    def _add_pdf_msd_split_table(self, data, x_offset=10, y_offset=None):
+        if y_offset == None:
             y_offset = self.pdf_object.get_y()
         else:
-            y_offset=y_offset
+            y_offset = y_offset
         self.pdf_object.set_xy(x_offset, y_offset)
 
         self.pdf_object.set_font("Arial", size=7)
         col_width = 25
         self.pdf_object.set_font("Arial", style="B", size=6)
-        self.pdf_object.cell(col_width, 3, "RoG range [km]", border='TB', align="C")
-        self.pdf_object.cell(col_width, 3, "Curve", border='TB', align="C")
-        self.pdf_object.cell(col_width, 3, "Param 1", border='TB', align="C")
-        self.pdf_object.cell(col_width, 3, "Param 2", border='TB', align="C")
+        self.pdf_object.cell(col_width, 3, "RoG range [km]", border="TB", align="C")
+        self.pdf_object.cell(col_width, 3, "Curve", border="TB", align="C")
+        self.pdf_object.cell(col_width, 3, "Param 1", border="TB", align="C")
+        self.pdf_object.cell(col_width, 3, "Param 2", border="TB", align="C")
         self.pdf_object.ln()
         self.pdf_object.set_font("Arial", size=6)
 
         for index, row in data.iterrows():
-            self.pdf_object.cell(col_width, 3, row["RoG range [km]"], border=0, align="C")
+            self.pdf_object.cell(
+                col_width, 3, row["RoG range [km]"], border=0, align="C"
+            )
             self.pdf_object.cell(col_width, 3, row["curve"], border=0, align="C")
-            self.pdf_object.cell(col_width, 3, str(round(row["param1"],10)), border=0, align="C")
-            self.pdf_object.cell(col_width, 3, str(round(row["param2"],10)), border=0, align="C")
+            self.pdf_object.cell(
+                col_width, 3, str(round(row["param1"], 10)), border=0, align="C"
+            )
+            self.pdf_object.cell(
+                col_width, 3, str(round(row["param2"], 10)), border=0, align="C"
+            )
             self.pdf_object.ln()
 
-
-        self.pdf_object.cell(col_width*4, 0, "", border="T")
+        self.pdf_object.cell(col_width * 4, 0, "", border="T")
         self.pdf_object.ln(1)
 
     def _add_pdf_distribution_table(self, data):
         self.pdf_object.set_font("Arial", style="B", size=6)
-        self.pdf_object.cell(35, 3, "Distribution", border='TB', align="C")
-        self.pdf_object.cell(50, 3, "Score", border='TB', align="C")
-        self.pdf_object.cell(100, 3, "Params", border='TB', align="C")
+        self.pdf_object.cell(35, 3, "Distribution", border="TB", align="C")
+        self.pdf_object.cell(50, 3, "Score", border="TB", align="C")
+        self.pdf_object.cell(100, 3, "Params", border="TB", align="C")
         self.pdf_object.set_font("Arial", size=6)
         self.pdf_object.ln()
 
         for index, row in data.iterrows():
             try:
                 self.pdf_object.cell(35, 3, row["name"], border=0, align="C")
-                self.pdf_object.cell(50, 3, str(round(row["score"],15)), border=0, align="C")
-                self.pdf_object.cell(100, 3, str(tuple(round(x, 5) for x in row["params"])).replace("(","").replace(")",""), border=0, align="C")
+                self.pdf_object.cell(
+                    50, 3, str(round(row["score"], 15)), border=0, align="C"
+                )
+                self.pdf_object.cell(
+                    100,
+                    3,
+                    str(tuple(round(x, 5) for x in row["params"]))
+                    .replace("(", "")
+                    .replace(")", ""),
+                    border=0,
+                    align="C",
+                )
                 # self.pdf_object.cell(40, 5, str(row["params"]), border=1, align="C")
                 self.pdf_object.ln()
             except:
@@ -1197,10 +1357,14 @@ class Laws:
 
         if exp_y_pred is not None and exp_y_pred.size > 0:
             plt.plot(plot_data.index, y_pred, c="k", linestyle="--", label="Sigmoid")
-            plt.plot(plot_data.index, exp_y_pred, c="r", linestyle="-.", label="Expon neg")
+            plt.plot(
+                plot_data.index, exp_y_pred, c="r", linestyle="-.", label="Expon neg"
+            )
 
         else:
-            plt.plot(plot_data.index, y_pred, c="k", linestyle="--", label="Fitted curve")
+            plt.plot(
+                plot_data.index, y_pred, c="k", linestyle="--", label="Fitted curve"
+            )
 
         plt.scatter(plot_data.index, plot_data, color="darkturquoise", label="Data")
         plt.xscale("log")
@@ -1231,7 +1395,7 @@ class Laws:
 
         sns.set_style("whitegrid")
         plt.figure(figsize=(8, 6))
-        plt.hist(values, color='darkturquoise',bins=100, density=True)
+        plt.hist(values, color="darkturquoise", bins=100, density=True)
         plt.xlabel(measure_type)
         plt.ylabel("Values")
         plt.loglog()
@@ -1251,7 +1415,7 @@ class Laws:
             pdf_properties={"color": "black", "linewidth": 2, "linestyle": "--"},
             bar_properties=None,
             cii_properties=None,
-            emp_properties={"color": "darkturquoise","linewidth": 0, "marker": "o"},
+            emp_properties={"color": "darkturquoise", "linewidth": 0, "marker": "o"},
             figsize=(8, 6),
         )
         plt.xlabel(measure_type)
@@ -1345,13 +1509,25 @@ class Laws:
         buffer_plot_model.seek(0)
         return buffer_plot_distribution, buffer_plot_model
 
-    def _plot_P_new(self,rho_est, gamma_est, DeltaS, S_mid, intercept, slope, nrows, n_data):
+    def _plot_P_new(
+        self, rho_est, gamma_est, DeltaS, S_mid, intercept, slope, nrows, n_data
+    ):
 
         buffer1 = BytesIO()
         sns.set_style("whitegrid")
         plt.figure(figsize=(8, 4.5))
-        plt.plot(np.arange(1, nrows), [rho_est * x ** (-gamma_est) for x in range(1, nrows)], label="Estimated",color='darkturquoise')
-        plt.plot(np.arange(1, nrows), [0.6 * x ** (-0.21) for x in range(1, nrows)], label="Paper", color='black')
+        plt.plot(
+            np.arange(1, nrows),
+            [rho_est * x ** (-gamma_est) for x in range(1, nrows)],
+            label="Estimated",
+            color="darkturquoise",
+        )
+        plt.plot(
+            np.arange(1, nrows),
+            [0.6 * x ** (-0.21) for x in range(1, nrows)],
+            label="Paper",
+            color="black",
+        )
         plt.legend()
         plt.xlabel("Time steps (n)")
         plt.ylabel("P_new (estimated vs. reference)")
@@ -1366,17 +1542,22 @@ class Laws:
         plt.close()
         buffer1.seek(0)
 
-
         buffer2 = BytesIO()
         sns.set_style("whitegrid")
         plt.figure(figsize=(8, 4.5))
-        plt.plot(np.log(S_mid), np.log(DeltaS), 'o', label='Data (log-log)',color='darkturquoise')
+        plt.plot(
+            np.log(S_mid),
+            np.log(DeltaS),
+            "o",
+            label="Data (log-log)",
+            color="darkturquoise",
+        )
         X_line = np.linspace(np.log(min(S_mid)), np.log(max(S_mid)), 100)
         y_line = intercept + slope * X_line
-        plt.plot(X_line, y_line, '--', label='Fit', color='black')
-        plt.xlabel('ln(S)')
-        plt.ylabel('ln(ΔS)')
-        plt.title('log(ΔS) vs. log(S)')
+        plt.plot(X_line, y_line, "--", label="Fit", color="black")
+        plt.xlabel("ln(S)")
+        plt.ylabel("ln(ΔS)")
+        plt.title("log(ΔS) vs. log(S)")
         plt.legend()
         plt.savefig(
             os.path.join(
@@ -1389,9 +1570,6 @@ class Laws:
         buffer2.seek(0)
 
         return buffer1, buffer2
-
-    def _plot_Ploglog(self):
-        pass
 
     def log_curve_fitting_resluts(func):
         def wrapper(self, *args, **kwargs):
@@ -1407,18 +1585,27 @@ class Laws:
                 }
             )
 
-            func_name = func_name.replace('_',' ').split(' ')
+            func_name = func_name.replace("_", " ").split(" ")
             func_name[0] = func_name[0].capitalize()
             self.pdf_object.set_font("Arial", "B", size=8)
             self._add_pdf_cell(f"{' '.join(func_name)}")
             self.pdf_object.set_font("Arial", size=7)
             self._add_pdf_cell(
-                f'Best fit: {best_fit} with Param 1: {filtered_df["param1"].values[0]}, Param 2: {filtered_df["param2"].values[0]}'
+                f'Best fit: {best_fit} with Param 1: {filtered_df["param1"].values[0]},'
+                f'Param 2: {filtered_df["param2"].values[0]}'
             )
 
             y_position_global = float(self.pdf_object.get_y())
-            self._add_pdf_curves_table(param_frame,x_offset=10,y_offset=y_position_global+13)
-            self._add_pdf_plot(plot_obj=plot_obj,image_width=80, image_height=45, x_position= 125, y_position = y_position_global)
+            self._add_pdf_curves_table(
+                param_frame, x_offset=10, y_offset=y_position_global + 13
+            )
+            self._add_pdf_plot(
+                plot_obj=plot_obj,
+                image_width=80,
+                image_height=45,
+                x_position=125,
+                y_position=y_position_global,
+            )
 
         return wrapper
 
@@ -1431,7 +1618,7 @@ class Laws:
                 {f"{results[0]}_params": results[1].model["params"]}
             )
 
-            func_name = results[0].replace('_',' ').split(' ')
+            func_name = results[0].replace("_", " ").split(" ")
             func_name[0] = func_name[0].capitalize()
             self.pdf_object.set_font("Arial", "B", size=8)
             self._add_pdf_cell(f"{' '.join(func_name)}")
@@ -1440,10 +1627,16 @@ class Laws:
                 f'Best fit: {results[1].model["name"]} with params: {results[1].model["params"]}'
             )
 
-            self._add_pdf_distribution_table(results[1].summary[["name", "score",'params']])
+            self._add_pdf_distribution_table(
+                results[1].summary[["name", "score", "params"]]
+            )
             y_position_global = float(self.pdf_object.get_y())
-            self._add_pdf_plot(results[2], 80, 60,x_position= 10, y_position = y_position_global)
-            self._add_pdf_plot(results[3], 80, 60,x_position= 110, y_position = y_position_global)
+            self._add_pdf_plot(
+                results[2], 80, 60, x_position=10, y_position=y_position_global
+            )
+            self._add_pdf_plot(
+                results[3], 80, 60, x_position=110, y_position=y_position_global
+            )
 
             if len(results) == 5:
                 self._add_pdf_cell(
@@ -1455,7 +1648,9 @@ class Laws:
                 self._add_pdf_cell(
                     f'Right distribution is {results[4][1].model["name"]} with params: {results[4][1].model["params"]}'
                 )
-                self._add_pdf_distribution_table(results[4][1].summary[["name", "score",'params']])
+                self._add_pdf_distribution_table(
+                    results[4][1].summary[["name", "score", "params"]]
+                )
                 plot_distribution, plot_models = self._plot_double_distribution(
                     results[4][0],
                     results[4][1],
@@ -1465,8 +1660,16 @@ class Laws:
                     results[0],
                 )
                 y_position_global = float(self.pdf_object.get_y())
-                self._add_pdf_plot(plot_distribution, 80, 60,x_position= 10, y_position = y_position_global)
-                self._add_pdf_plot(plot_models, 80, 60,x_position= 110, y_position = y_position_global)
+                self._add_pdf_plot(
+                    plot_distribution,
+                    80,
+                    60,
+                    x_position=10,
+                    y_position=y_position_global,
+                )
+                self._add_pdf_plot(
+                    plot_models, 80, 60, x_position=110, y_position=y_position_global
+                )
             self.pdf_object.add_page()
 
         return wrapper
@@ -1477,8 +1680,8 @@ class Laws:
                 self, *args, **kwargs
             )  # type: ignore
 
-            self.stats_frame.add_data({'rho': rho_est})
-            self.stats_frame.add_data({'gamma': gamma_est})
+            self.stats_frame.add_data({"rho": rho_est})
+            self.stats_frame.add_data({"gamma": gamma_est})
 
             self.pdf_object.set_font("Arial", "B", size=8)
             self._add_pdf_cell("Pnew estimation")
@@ -1486,38 +1689,61 @@ class Laws:
             self.pdf_object.ln()
             self.pdf_object.ln()
             self.pdf_object.set_font("Arial", size=7)
-            self._add_pdf_cell(
-                f"gamma  = {gamma_est:.4f}")
-            self._add_pdf_cell(
-                f"rho  = {rho_est:.4f}")
+            self._add_pdf_cell(f"gamma  = {gamma_est:.4f}")
+            self._add_pdf_cell(f"rho  = {rho_est:.4f}")
             y_position_global = float(self.pdf_object.get_y())
-            plot_obj1, plot_obj2 = self._plot_P_new(rho_est, gamma_est, DeltaS, S_mid, intercept, slope, nrows, n_data)
-            self._add_pdf_plot(plot_obj=plot_obj1,image_width=80, image_height=45, x_position= 10, y_position = y_position_global)
-            self._add_pdf_plot(plot_obj=plot_obj2,image_width=80, image_height=45, x_position= 110, y_position = y_position_global)
+            plot_obj1, plot_obj2 = self._plot_P_new(
+                rho_est, gamma_est, DeltaS, S_mid, intercept, slope, nrows, n_data
+            )
+            self._add_pdf_plot(
+                plot_obj=plot_obj1,
+                image_width=80,
+                image_height=45,
+                x_position=10,
+                y_position=y_position_global,
+            )
+            self._add_pdf_plot(
+                plot_obj=plot_obj2,
+                image_width=80,
+                image_height=45,
+                x_position=110,
+                y_position=y_position_global,
+            )
 
         return wrapper
 
     def log_msd_split(func):
         def wrapper(self, *args, **kwargs):
-            msd_results, plot_obj = func(
-                self, *args, **kwargs
-            )  # type: ignore
-            msd_curve = "; ".join(msd_results['RoG range [km]'] + ": " + msd_results['curve'])
-            msd_curve_params = "; ".join(msd_results['RoG range [km]'] + "(" + msd_results['curve'] + ")" + ":" + msd_results['param1'].astype(str) + "," + msd_results['param2'].astype(str))
-
-            self.stats_frame.add_data({'msd_curve': msd_curve})
-            self.stats_frame.add_data(
-                {
-                    "msd_curve_params": msd_curve_params
-                }
+            msd_results, plot_obj = func(self, *args, **kwargs)  # type: ignore
+            msd_curve = "; ".join(
+                msd_results["RoG range [km]"] + ": " + msd_results["curve"]
             )
+            msd_curve_params = "; ".join(
+                msd_results["RoG range [km]"]
+                + "("
+                + msd_results["curve"]
+                + ")"
+                + ":"
+                + msd_results["param1"].astype(str)
+                + ","
+                + msd_results["param2"].astype(str)
+            )
+
+            self.stats_frame.add_data({"msd_curve": msd_curve})
+            self.stats_frame.add_data({"msd_curve_params": msd_curve_params})
 
             self.pdf_object.set_font("Arial", "B", size=8)
             self._add_pdf_cell("MSD split")
             y_position_global = float(self.pdf_object.get_y())
             self.pdf_object.ln(4)
             self._add_pdf_msd_split_table(msd_results)
-            self._add_pdf_plot(plot_obj=plot_obj,image_width=80, image_height=45, x_position= 125, y_position = y_position_global)
+            self._add_pdf_plot(
+                plot_obj=plot_obj,
+                image_width=80,
+                image_height=45,
+                x_position=125,
+                y_position=y_position_global,
+            )
 
         return wrapper
 
@@ -1561,9 +1787,7 @@ class Laws:
                     )
                 else:
                     return func.__name__, model, plot_distribution_obj, plot_model_obj
-            elif(
-                model.model["name"] == 'pareto' and model.model['params'][0] > 2
-            ):
+            elif model.model["name"] == "pareto" and model.model["params"][0] > 2:
                 flexation_point_detection_results = Flexation().find_distributions(
                     model, np.sort(data.values)
                 )
@@ -1578,9 +1802,7 @@ class Laws:
                     )
                 else:
                     return func.__name__, model, plot_distribution_obj, plot_model_obj
-            elif(
-                model.model["name"] == 'lognorm' and model.model['params'][0] > 2
-            ):
+            elif model.model["name"] == "lognorm" and model.model["params"][0] > 2:
                 flexation_point_detection_results = Flexation().find_distributions(
                     model, np.sort(data.values)
                 )
@@ -1615,7 +1837,7 @@ class Laws:
             self.curve_fitting.model_choose(avg_vf)
         )
 
-        return best_fit, global_params, y_pred, expon_y_pred, avg_vf, ["Rank","f"]
+        return best_fit, global_params, y_pred, expon_y_pred, avg_vf, ["Rank", "f"]
 
     # @log_curve_fitting_resluts
     # @check_curve_fit
@@ -1644,7 +1866,26 @@ class Laws:
 
         # Fit to find the best theoretical distribution
         jl = jl[~jl.isna()]
-        model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
+        model = distfit(
+            distr=[
+                "norm",
+                "expon",
+                "pareto",
+                "dweibull",
+                "t",
+                "genextreme",
+                "gamma",
+                "lognorm",
+                "beta",
+                "uniform",
+                "loggamma",
+                "truncexpon",
+                "truncnorm",
+                "truncpareto",
+                "powerlaw",
+            ],
+            stats="wasserstein",
+        )
         model.fit_transform(jl.values)
 
         return model, jl
@@ -1663,9 +1904,27 @@ class Laws:
         wt = wt[~wt.isna()]  # type: ignore
         wt = wt[wt != 0]
 
-
         # Fit to find the best theoretical distribution
-        model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
+        model = distfit(
+            distr=[
+                "norm",
+                "expon",
+                "pareto",
+                "dweibull",
+                "t",
+                "genextreme",
+                "gamma",
+                "lognorm",
+                "beta",
+                "uniform",
+                "loggamma",
+                "truncexpon",
+                "truncnorm",
+                "truncpareto",
+                "powerlaw",
+            ],
+            stats="wasserstein",
+        )
         model.fit_transform(wt.values)
 
         return model, wt
@@ -1689,7 +1948,26 @@ class Laws:
         tt = tt[~tt.isna()]
 
         # Fit to find the best theoretical distribution
-        model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
+        model = distfit(
+            distr=[
+                "norm",
+                "expon",
+                "pareto",
+                "dweibull",
+                "t",
+                "genextreme",
+                "gamma",
+                "lognorm",
+                "beta",
+                "uniform",
+                "loggamma",
+                "truncexpon",
+                "truncnorm",
+                "truncpareto",
+                "powerlaw",
+            ],
+            stats="wasserstein",
+        )
         model.fit_transform(tt.values)
 
         return model, tt
@@ -1700,7 +1978,26 @@ class Laws:
         rog = radius_of_gyration(data, time_evolution=False)
 
         # Fit to find the best theoretical distribution
-        model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
+        model = distfit(
+            distr=[
+                "norm",
+                "expon",
+                "pareto",
+                "dweibull",
+                "t",
+                "genextreme",
+                "gamma",
+                "lognorm",
+                "beta",
+                "uniform",
+                "loggamma",
+                "truncexpon",
+                "truncnorm",
+                "truncpareto",
+                "powerlaw",
+            ],
+            stats="wasserstein",
+        )
         model.fit_transform(rog.values)
 
         return model, rog
@@ -1709,7 +2006,7 @@ class Laws:
     @check_curve_fit
     def rog_over_time(self, data: TrajectoriesFrame, min_records_no: int) -> tuple:
         rog = radius_of_gyration(data, time_evolution=True)
-        avg_rog = rowwise_average(rog,row_count=min_records_no)
+        avg_rog = rowwise_average(rog, row_count=min_records_no)
         avg_rog = avg_rog[~avg_rog.isna()]
 
         # model selection
@@ -1731,7 +2028,26 @@ class Laws:
     def msd_distribution(self, data: TrajectoriesFrame) -> tuple:
         msd = mean_square_displacement(data, time_evolution=False, from_center=True)
         # Fit to find the best theoretical distribution
-        model = distfit(distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform', 'loggamma','truncexpon','truncnorm','truncpareto','powerlaw'],stats="wasserstein")
+        model = distfit(
+            distr=[
+                "norm",
+                "expon",
+                "pareto",
+                "dweibull",
+                "t",
+                "genextreme",
+                "gamma",
+                "lognorm",
+                "beta",
+                "uniform",
+                "loggamma",
+                "truncexpon",
+                "truncnorm",
+                "truncpareto",
+                "powerlaw",
+            ],
+            stats="wasserstein",
+        )
         model.fit_transform(msd.values)
 
         return model, msd
@@ -1747,7 +2063,7 @@ class Laws:
             DistributionFitingTools().model_choose(avg_msd)
         )
 
-        return best_fit, global_params, y_pred, expon_y_pred, avg_msd, ["t","MSD"]
+        return best_fit, global_params, y_pred, expon_y_pred, avg_msd, ["t", "MSD"]
 
     @log_distribution_fitting_resluts
     @check_distribution_fit
@@ -1829,16 +2145,22 @@ class Laws:
 
     @log_msd_split
     def msd_curve_split(self, data):
-        gdf = gpd.GeoDataFrame(data, geometry=gpd.points_from_xy(data['lon'], data['lat']))  # convert GoeDataFrame
+        gdf = gpd.GeoDataFrame(
+            data, geometry=gpd.points_from_xy(data["lon"], data["lat"])
+        )  # convert GoeDataFrame
         gdf.crs = 4326
         gdf = gdf.to_crs(3857)  # transform
-        com = gdf.groupby(level=0).apply(lambda z: Point(z.geometry.x.mean(), z.geometry.y.mean()))  # center of mass
-        starting_points = gdf.groupby(level=0).head(1).droplevel(1).geometry  # first point of each
+        com = gdf.groupby(level=0).apply(
+            lambda z: Point(z.geometry.x.mean(), z.geometry.y.mean())
+        )  # center of mass
+        starting_points = (
+            gdf.groupby(level=0).head(1).droplevel(1).geometry
+        )  # first point of each
         to_concat_msd = []
         to_concat_rog = {}
         for ind, vals in gdf.groupby(level=0):
-            vals['is_new'] = ~vals.labels.duplicated(keep='first')  # only when explores
-            vals = vals[vals['is_new']]  # filter explorations
+            vals["is_new"] = ~vals.labels.duplicated(keep="first")  # only when explores
+            vals = vals[vals["is_new"]]  # filter explorations
             vals = vals.dropna()[1:]  # skip the first position
             msd_ind = vals.distance(starting_points.loc[ind]) ** 2  # MSD
             rog_ind = vals.distance(com.loc[ind]) ** 2  # RoG
@@ -1846,43 +2168,54 @@ class Laws:
             to_concat_msd.append(msd_ind)
             to_concat_rog[ind] = np.sqrt(rog_ind).mean()
         final_msd = pd.concat(to_concat_msd)  # gather into nice DF
-        final_rog = pd.DataFrame.from_dict(to_concat_rog, orient='index')  # the same for RoG
+        final_rog = pd.DataFrame.from_dict(
+            to_concat_rog, orient="index"
+        )  # the same for RoG
         # Okay, so that one is according to the paper, we group trajectories based on the RoG and then estimate MSD
         # curves for each of these groups separately
-        final_rog['bins'] = pd.cut(final_rog.values.ravel(),
-                                   bins=[0, 2e3, 4e3, 8e3, 16e3, 32e3, 64e3, 128e3, 256e3, 512e3, 1024e3])
-        msd_results = pd.DataFrame(columns=['RoG range [km]','curve','param1','param2'])
+        final_rog["bins"] = pd.cut(
+            final_rog.values.ravel(),
+            bins=[0, 2e3, 4e3, 8e3, 16e3, 32e3, 64e3, 128e3, 256e3, 512e3, 1024e3],
+        )
+        msd_results = pd.DataFrame(
+            columns=["RoG range [km]", "curve", "param1", "param2"]
+        )
         buffer = BytesIO()
         sns.set_style("whitegrid")
         plt.figure(figsize=(8, 4.5))
-        for ind, vals in final_rog.groupby('bins'):
+        for ind, vals in final_rog.groupby("bins"):
             if vals.empty:
                 continue
             if vals.shape[0] < 2:
                 continue
             msd_pick = final_msd.loc[vals.index.values]
-            msd_rows = int(msd_pick.groupby(level=0).apply(lambda x: len(x)).min())  # find min number of rows for
+            msd_rows = int(
+                msd_pick.groupby(level=0).apply(lambda x: len(x)).min()
+            )  # find min number of rows for
             # individuals
             msd_pick_avg = rowwise_average(msd_pick, msd_rows)
             try:  # now average rowwise
-                msd_chosen = DistributionFitingTools().model_choose(msd_pick_avg)  # pick model
+                msd_chosen = DistributionFitingTools().model_choose(
+                    msd_pick_avg
+                )  # pick model
             except ValueError:
                 continue
             if len(msd_chosen[0]) < 3:
                 continue
             avg_error = r2_score(np.log(msd_pick_avg[1:]), np.log(msd_chosen[0][1:]))
-            if avg_error < .25:
+            if avg_error < 0.25:
                 continue
-            msd_results = msd_results._append({
-                'RoG range [km]':f'{(int(ind.left/1000))}-{(int(ind.right/1000))}',
-                'curve':msd_chosen[1],
-                'param1':msd_chosen[2][0],
-                'param2':msd_chosen[2][1]# type: ignore
+            msd_results = msd_results._append(
+                {
+                    "RoG range [km]": f"{(int(ind.left/1000))}-{(int(ind.right/1000))}",
+                    "curve": msd_chosen[1],
+                    "param1": msd_chosen[2][0],
+                    "param2": msd_chosen[2][1],  # type: ignore
                 },
-                ignore_index=True
-                )
+                ignore_index=True,
+            )
             plt.scatter(np.arange(msd_rows), msd_pick_avg.values)
-            plt.plot(np.arange(msd_pick_avg.shape[0]), msd_chosen[0], label=f'RoG:<{(int(ind.right/1000))}km ({vals.shape[0]})') # type: ignore
+            plt.plot(np.arange(msd_pick_avg.shape[0]), msd_chosen[0], label=f"RoG:<{(int(ind.right/1000))}km ({vals.shape[0]})")  # type: ignore
 
         plt.legend()
         plt.loglog()
@@ -1905,7 +2238,14 @@ class Laws:
         y_pred, best_fit, best_fit_params, global_params, expon_y_pred = (
             DistributionFitingTools().model_choose(pd.Series(data))
         )
-        return best_fit, global_params, y_pred, expon_y_pred, pd.Series(data), ["t","S(t)"]
+        return (
+            best_fit,
+            global_params,
+            y_pred,
+            expon_y_pred,
+            pd.Series(data),
+            ["t", "S(t)"],
+        )
 
     @log_pnew_estimation
     def estimate_pnew(self, nrows, n_data, S_t) -> tuple:
@@ -1941,6 +2281,7 @@ class Laws:
 
         return rho_est, gamma_est, DeltaS, S_mid, intercept, slope, nrows, n_data
 
+
 class ScalingLawsCalc:
 
     def __init__(
@@ -1968,7 +2309,9 @@ class ScalingLawsCalc:
         self.pdf.add_page()
         self.pdf.set_auto_page_break(auto=True, margin=15)
         self.pdf.set_font("Arial", "B", size=12)
-        self.pdf.cell(200, 10, text=f"{self.animal_name.replace('_',' ')}", ln=True, align="C")
+        self.pdf.cell(
+            200, 10, text=f"{self.animal_name.replace('_',' ')}", ln=True, align="C"
+        )
         self.pdf.set_font("Arial", size=9)
         self.pdf.ln(5)
 
@@ -2025,11 +2368,25 @@ class ScalingLawsCalc:
         self.stats_frame.add_data({"min_area": stats.get_min_area(filtered_animals)})
         self.stats_frame.add_data({"max_area": stats.get_max_area(filtered_animals)})
 
-        self.stats_frame.add_data({"mean_label_no": stats.get_mean_labels_no_after_filtration(filtered_animals)})
-        self.stats_frame.add_data({"std_label_no": stats.get_std_labels_no_after_filtration(filtered_animals)})
-        self.stats_frame.add_data({"mean_records": stats.get_mean_records_no_before_filtration(self.data)})
-        self.stats_frame.add_data({"std_records": stats.get_std_records_no_before_filtration(self.data)})
-        self.stats_frame.add_data({"std_duration": stats.get_std_periods(filtered_animals)})
+        self.stats_frame.add_data(
+            {
+                "mean_label_no": stats.get_mean_labels_no_after_filtration(
+                    filtered_animals
+                )
+            }
+        )
+        self.stats_frame.add_data(
+            {"std_label_no": stats.get_std_labels_no_after_filtration(filtered_animals)}
+        )
+        self.stats_frame.add_data(
+            {"mean_records": stats.get_mean_records_no_before_filtration(self.data)}
+        )
+        self.stats_frame.add_data(
+            {"std_records": stats.get_std_records_no_before_filtration(self.data)}
+        )
+        self.stats_frame.add_data(
+            {"std_duration": stats.get_std_periods(filtered_animals)}
+        )
         self.stats_frame.add_data({"std_area": stats.get_std_area(filtered_animals)})
 
         # FIXME: choose data for compressed csv and next step of calculations
@@ -2038,12 +2395,19 @@ class ScalingLawsCalc:
     def _advenced_preprocessing(self):
         preproc = Prepocessing()
         filtrated_data = preproc.filter_by_quartiles(self.data)
-        data = filtrated_data.reset_index().drop(columns=['Unnamed: 0','geometry']).drop_duplicates().set_index('user_id')
+        data = (
+            filtrated_data.reset_index()
+            .drop(columns=["Unnamed: 0", "geometry"])
+            .drop_duplicates()
+            .set_index("user_id")
+        )
         filled_data = preproc.filing_data(data)
 
         nrows = int(filled_data.groupby(level=0).apply(lambda x: len(x)).min())
         n_data = np.arange(1, nrows + 1)
-        S_data = [filled_data.groupby(level=0)['new_sum'].nth(x).mean() for x in range(nrows)]
+        S_data = [
+            filled_data.groupby(level=0)["new_sum"].nth(x).mean() for x in range(nrows)
+        ]
         return filled_data, nrows, n_data, S_data
 
     def process_file(self) -> None:
@@ -2051,7 +2415,9 @@ class ScalingLawsCalc:
         self.stats_frame.add_data({"animal": self.animal_name})
 
         filtered_animals = self._preprocess_data()
-        filtered_animals.to_csv(os.path.join(self.output_dir,f'compressed_{self.animal_name}.csv'))
+        filtered_animals.to_csv(
+            os.path.join(self.output_dir, f"compressed_{self.animal_name}.csv")
+        )
         filled_data, nrows, n_data, S_data = self._advenced_preprocessing()
 
         min_label_no = [
@@ -2093,4 +2459,3 @@ class ScalingLawsCalc:
         self.pdf.output(pdf_path)
 
         self.stats_frame.add_record()
-
