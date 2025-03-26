@@ -113,13 +113,68 @@ def data_structuring(dataframe:pd.DataFrame) -> Optional[pd.DataFrame]:
         logging.error(f'Data structuring error: {e}')
 
 def filter_records(dataframe: pd.DataFrame) -> pd.DataFrame:
-    dataframe_without_zeros = dataframe[~((dataframe['lat'] == 0) & (dataframe['lon'] == 0))]
-    dataframe_filtered = dataframe_without_zeros.groupby(level=0).apply(lambda group: group[~group['datetime'].duplicated()])
+    """
+    Filters out records with zero latitude and longitude,
+    and removes duplicate datetime entries.
+
+    This function performs two main operations on the provided dataframe:
+    1. It removes any rows where both latitude ('lat') and longitude
+        ('lon') are zero.
+    2. It eliminates any duplicate entries in the 'datetime' column for each
+    individual, based on the index (assumed to be 'user_id' or similar).
+
+    Parameters:
+    -----------
+    dataframe : pd.DataFrame
+        The dataframe containing at least 'lat', 'lon', and 'datetime' columns.
+        The dataframe is assumed to be indexed by user or individual ID (level 0).
+
+    Returns:
+    --------
+    pd.DataFrame
+        A filtered dataframe with records having non-zero latitude and longitude,
+        and no duplicate datetime values within each individual group.
+    """
+    dataframe_without_zeros = dataframe[
+        ~((dataframe['lat'] == 0) & (dataframe['lon'] == 0))
+    ]
+    dataframe_filtered = dataframe_without_zeros.groupby(level=0).apply(
+        lambda group: group[~group['datetime'].duplicated()]
+    )
     dataframe_filtered = dataframe_filtered.reset_index(drop=True)
     return dataframe_filtered
 
 
 def filter_by_month_range(data, start, end, in_out=True):
+    """
+    Filters the dataset by a specified range of months.
+
+    This function allows you to filter data based on a range of months.
+    It compares the 'datetime' column of the dataframe to the specified
+    range (start month and end month) and returns the data within
+    (or outside) the range
+    based on the 'in_out' parameter.
+
+    Parameters:
+    -----------
+    data : pd.DataFrame
+        A dataframe containing a 'datetime' column, which will be used
+            to filter based on the month.
+    start : int
+        The start month (1 for January, 12 for December).
+    end : int
+        The end month (1 for January, 12 for December).
+    in_out : bool, optional, default=True
+        If True, the function will return rows where the month
+            is between `start` and `end` (inclusive).
+        If False, it will return rows where the month is outside this range.
+
+    Returns:
+    --------
+    pd.DataFrame
+        A dataframe containing only the rows that meet the specified
+        month range condition.
+    """
     data['datetime'] = pd.to_datetime(data['datetime'], errors='coerce')
     months = data['datetime'].dt.month
 
@@ -135,7 +190,9 @@ def filter_by_month_range(data, start, end, in_out=True):
     return result
 
 
-def data_write(dataframe:pd.DataFrame, filename:str, output_path:Optional[str]=None):
+def data_write(
+        dataframe:pd.DataFrame, filename:str, output_path:Optional[str]=None
+    ):
     """
     Writes the processed DataFrame to a CSV file.
 

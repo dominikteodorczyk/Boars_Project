@@ -1,3 +1,12 @@
+"""
+Module for handling data input/output operations related to trajectory
+analysis.
+
+This module provides functions and a class (`DataIO`) for managing file
+paths, reading trajectory data from CSV files, processing them,
+and extracting metadata like animal names.
+"""
+
 from numpy import size
 import pandas as pd
 import os
@@ -27,6 +36,7 @@ def get_file_paths(directory:str) -> list:
     Returns:
         list: A list of full file paths to all files in the directory.
     """
+
     return [
         os.path.join(directory, file)
         for file in os.listdir(directory)
@@ -48,6 +58,7 @@ def create_output_directory(base_path:str, dir_name: str) -> str:
     Raises:
         OSError: If the directory cannot be created due to system errors.
     """
+
     output_path = os.path.join(base_path, dir_name)
     if not os.path.exists(output_path):
         try:
@@ -55,13 +66,39 @@ def create_output_directory(base_path:str, dir_name: str) -> str:
         except OSError as e:
             raise OSError(f"Failed to create output "
                           f"directory at {output_path}: {e}")
+
     return output_path
 
 
+
 class DataIO:
+    """
+    A class providing static methods for handling trajectory
+    data input and processing.
+
+    This class includes methods to open and preprocess
+    trajectory data files, ensuring they are formatted correctly
+    for further analysis.
+    """
 
     @staticmethod
-    def open_for_scaling_laws(csv_path):
+    def open_for_scaling_laws(csv_path: str) -> TrajectoriesFrame:
+        """
+        Opens a CSV file and converts it into a TrajectoriesFrame suitable
+        for scaling law analysis.
+
+        Args:
+            csv_path (str): The path to the CSV file containing
+                trajectory data.
+
+        Returns:
+            TrajectoriesFrame: A structured data frame with the
+                loaded trajectory data.
+
+        Raises:
+            FileNotFoundError: If the specified file does not exist.
+        """
+
         if not os.path.exists(csv_path):
             raise FileNotFoundError(
                 f"The file at {csv_path} does not exist."
@@ -69,6 +106,7 @@ class DataIO:
 
         raw_data = pd.read_csv(csv_path)
         raw_data["time"] = pd.to_datetime(raw_data["time"], unit="s")
+
         return TrajectoriesFrame(
                     raw_data,
                     {
@@ -76,6 +114,7 @@ class DataIO:
                         "crs": 4326,
                     },
                 )
+
 
     @staticmethod
     def open_for_infostop(csv_path: str) -> TrajectoriesFrame:
@@ -97,6 +136,7 @@ class DataIO:
             KeyError: If expected columns ('datetime', 'user_id', 'geometry',
                 'lon', 'lat') are missing.
         """
+
         if not os.path.exists(csv_path):
             raise FileNotFoundError(
                 f"The file at {csv_path} does not exist."
@@ -135,6 +175,7 @@ class DataIO:
             raise ValueError(f"Error parsing the CSV file: {e}")
         except Exception as e:
             raise Exception(f"An unexpected error occurred: {e}")
+
 
     @staticmethod
     def get_animal_name(csv_path: str) -> str:

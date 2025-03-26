@@ -21,7 +21,11 @@ from itertools import product
 import pandas as pd
 from infostop import Infostop
 import numpy as np
-from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
+from sklearn.metrics import (
+    silhouette_score,
+    calinski_harabasz_score,
+    davies_bouldin_score
+)
 from tqdm import tqdm
 from fpdf import FPDF
 from humobi.structures.trajectory import TrajectoriesFrame
@@ -33,14 +37,10 @@ from humobi.tools.user_statistics import (
     consecutive_record,
 )
 from constans import const
-
 import matplotlib
-
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
-
 import seaborn as sns
-
 sns.set_style("whitegrid")
 
 logging.basicConfig(
@@ -52,6 +52,7 @@ warnings.filterwarnings(
     "ignore",
     message="Pandas doesn't allow columns to be created via a new attribute name"
     )
+
 
 class DataAnalystInfostop:
     """
@@ -75,6 +76,7 @@ class DataAnalystInfostop:
         self.pdf_object = pdf_object
         self.output_path = output_path
 
+
     def generate_raport(
             self,
             data: TrajectoriesFrame,
@@ -96,6 +98,7 @@ class DataAnalystInfostop:
         Executes a data analysis pipeline, generating various statistical
         metrics and plots, which are sequentially added to the PDF document.
         """
+
         self._add_analyst_title(data_analyst_no)
         self._add_basic_statistics(data, data_analyst_no)
         self._add_total_records_statistics(data, data_analyst_no)
@@ -111,6 +114,7 @@ class DataAnalystInfostop:
         self._add_average_temporal_resolution(data, data_analyst_no)
         self.pdf_object.add_page()
 
+
     def _add_pdf_cell(self, txt_to_add: str) -> None:
         """
         Adds a single line of text to the PDF.
@@ -120,7 +124,9 @@ class DataAnalystInfostop:
         txt_to_add : str
             Text to be added to the PDF document.
         """
+
         self.pdf_object.cell(200, 5, text=txt_to_add, ln=True, align="L")
+
 
     def _add_pdf_plot(
         self,
@@ -143,6 +149,7 @@ class DataAnalystInfostop:
         x_position : int, optional
             X-coordinate position of the plot, by default 10.
         """
+
         y_position = self.pdf_object.get_y()
         self.pdf_object.image(
             plot_obj,
@@ -153,6 +160,7 @@ class DataAnalystInfostop:
         )
         self.pdf_object.set_y(y_position + image_height + 10)
         plot_obj.close()
+
 
     def _plot_fraction_of_empty_records(
         self, frac: pd.Series, data_analyst_no: int
@@ -172,6 +180,7 @@ class DataAnalystInfostop:
         BytesIO
             In-memory image buffer of the generated plot.
         """
+
         thresholds = [round(i, 2) for i in np.arange(0.01, 1.01, 0.01)]
         num_of_complete = {
             threshold: (frac <= threshold).sum() for threshold in thresholds
@@ -195,7 +204,9 @@ class DataAnalystInfostop:
         plt.savefig(buffer, format="png")
         plt.close()
         buffer.seek(0)
+
         return buffer
+
 
     def _plot_distribution(
         self, data: pd.Series, plot_name: str, bins: int = 10
@@ -217,13 +228,16 @@ class DataAnalystInfostop:
         BytesIO
             In-memory image buffer of the generated distribution plot.
         """
+
         buffer = BytesIO()
         sns.displot(data, kde=True, bins=bins)  # type: ignore
         plt.savefig(os.path.join(self.output_path, plot_name))
         plt.savefig(buffer, format="png")
         plt.close()
         buffer.seek(0)
+
         return buffer
+
 
     def _add_analyst_title(self, data_analyst_no: int) -> None:
         """
@@ -234,7 +248,9 @@ class DataAnalystInfostop:
         data_analyst_no : int
             Analysis identifier used in the title.
         """
+
         self._add_pdf_cell(f"Data Analysis: {data_analyst_no}")
+
 
     def _add_basic_statistics(
         self, data: TrajectoriesFrame, data_analyst_no: int
@@ -250,6 +266,7 @@ class DataAnalystInfostop:
         data_analyst_no : int
             Analysis identifier.
         """
+
         number_of_animals = len(data.get_users())
         self._add_pdf_cell(f"Number of animals: {number_of_animals}")
 
@@ -266,6 +283,7 @@ class DataAnalystInfostop:
 
         self._add_pdf_plot(plot_obj, 100, 60)
 
+
     def _add_total_records_statistics(self, data, data_analyst_no) -> None:
         """
         Adds total record statistics to the PDF, including median
@@ -278,6 +296,7 @@ class DataAnalystInfostop:
         data_analyst_no : int
             Analysis identifier.
         """
+
         count = count_records(data)
         count_median = count.median()
         count_mean = count.mean()
@@ -295,6 +314,7 @@ class DataAnalystInfostop:
 
         self._add_pdf_plot(plot_obj, 60, 60)
 
+
     def _add_records_per_time_frame(
             self, data, data_analyst_no, resolution
         ) -> None:
@@ -310,6 +330,7 @@ class DataAnalystInfostop:
         resolution : str
             Time resolution for analysis (e.g., '1D', '1H').
         """
+
         count_per_time_frame = count_records_per_time_frame(
             data,
             resolution=resolution
@@ -340,6 +361,7 @@ class DataAnalystInfostop:
 
         self._add_pdf_plot(plot_obj, 60, 60)
 
+
     def _add_trajctories_duration(
             self, data, data_analyst_no, resolution
         ) -> None:
@@ -355,6 +377,7 @@ class DataAnalystInfostop:
         resolution : str
             Time resolution for trajectory duration (e.g., '1H').
         """
+
         trajectories_duration_1H = user_trajectories_duration(
             data, resolution=resolution, count_empty=False
         )
@@ -371,6 +394,7 @@ class DataAnalystInfostop:
         )
         self._add_pdf_plot(plot_obj, 60, 60)
 
+
     def _add_no_of_consecutive_records(
             self, data, data_analyst_no, resolution
         ) -> None:
@@ -386,6 +410,7 @@ class DataAnalystInfostop:
         resolution : str
             Time resolution for consecutive records analysis (e.g., '1H').
         """
+
         consecutive_1h = consecutive_record(data, resolution=resolution)
         consecutive_1h_median = consecutive_1h.median()
 
@@ -401,6 +426,7 @@ class DataAnalystInfostop:
         )
         self._add_pdf_plot(plot_obj, 60, 60)
 
+
     def _add_average_temporal_resolution(
             self, data, data_analyst_no
         ) -> None:
@@ -415,6 +441,7 @@ class DataAnalystInfostop:
         data_analyst_no : int
             Analysis identifier used in plot filenames.
         """
+
         if len(data.get_users()) != 1:
             temporal_df = (
                 data.reset_index(level=1)
@@ -446,6 +473,7 @@ class DataAnalystInfostop:
         self._add_pdf_plot(plot_obj, 60, 60)
 
 
+
 class DataFilter:
     """
     A class responsible for filtering, processing, and sorting
@@ -475,9 +503,11 @@ class DataFilter:
             day_window (int): The number of days considered for
                 the time window.
         """
+
         self.pdf_object = pdf_object
         self.allowed_minutes = const.ALLOWED_MINUTES
         self.day_window = const.DAYS_WINDOW
+
 
     def _add_pdf_cell(self, txt_to_add: str) -> None:
         """
@@ -486,7 +516,9 @@ class DataFilter:
         Args:
             txt_to_add (str): The text to be added to the PDF document.
         """
+
         self.pdf_object.cell(200, 5, text=txt_to_add, ln=True, align="L")
+
 
     def _match_timedelta(self, timedelta: pd.Series) -> tuple:
         """
@@ -501,6 +533,7 @@ class DataFilter:
                 of the closest temporal resolution (e.g., '10min')
                 and its integer value in minutes.
         """
+
         try:
             closest_minute = min(
                 self.allowed_minutes, key=lambda x: abs(
@@ -513,6 +546,7 @@ class DataFilter:
                              f"{timedelta}. Details: {e}"
                         )
 
+
     def _select_time_window(self, closest_minute: int) -> int:
         """
         Calculates the number of records required for a rolling window
@@ -524,6 +558,7 @@ class DataFilter:
         Returns:
             int: The number of records required for a rolling window.
         """
+
         try:
             per_hour = 60 / closest_minute
             per_day = per_hour * 24
@@ -533,6 +568,7 @@ class DataFilter:
                 f"Error calculating time window for resolution "
                 f"{closest_minute}: {e}"
             )
+
 
     def _extract_best_coverage(
         self, data: pd.DataFrame, data_coverage: pd.Series
@@ -548,6 +584,7 @@ class DataFilter:
         Returns:
             pd.DataFrame: The extracted data with the best coverage.
         """
+
         try:
             extracted = []
             for an_id, an_val in data_coverage.groupby(level=0):
@@ -576,6 +613,7 @@ class DataFilter:
         except Exception as e:
             raise ValueError(f"Error extracting best coverage: {e}")
 
+
     def _convert_to_unix(self, group: pd.DataFrame) -> pd.DataFrame:
         """
         Converts a datetime column to UNIX timestamps.
@@ -587,6 +625,7 @@ class DataFilter:
             pd.DataFrame: The DataFrame with the 'time' column
                 converted to UNIX timestamps.
         """
+
         try:
             group["time"] = group["time"].apply(
                 lambda x: int(pd.to_datetime(x).timestamp())
@@ -596,6 +635,7 @@ class DataFilter:
             raise ValueError(f"Error converting datetime "
                              f"to UNIX timestamps: {e}"
                         )
+
 
     def select_best_period(self, data: TrajectoriesFrame) -> TrajectoriesFrame:
         """
@@ -611,6 +651,7 @@ class DataFilter:
         Raises:
             ValueError: If there is an error during data selection.
         """
+
         try:
             if len(data.get_users()) != 1:
                 temporal_df = (
@@ -658,6 +699,7 @@ class DataFilter:
         except Exception as e:
             raise ValueError(f"Error selecting best period: {e}")
 
+
     def filter_data(self, data: pd.DataFrame) -> TrajectoriesFrame:
         """
         Filters the data based on various user statistics.
@@ -672,6 +714,7 @@ class DataFilter:
         Raises:
             ValueError: If there is an error during filtering.
         """
+
         try:
             temporal_df = (
                 data.reset_index(level=1)
@@ -707,6 +750,7 @@ class DataFilter:
         except Exception as e:
             raise ValueError(f"Error filtering data: {e}")
 
+
     def sort_data(self, data: TrajectoriesFrame) -> pd.DataFrame:
         """
         Sorts and prepares trajectory data for infostop processing.
@@ -721,6 +765,7 @@ class DataFilter:
         Raises:
             ValueError: If there is an error during sorting or preparation.
         """
+
         try:
             data_sorted = data.sort_index(level=[0, 1])
             data_sorted = data_sorted.to_crs(dest_crs=const.ELLIPSOIDAL_CRS, cur_crs=const.CARTESIAN_CRS)  # type: ignore
@@ -738,6 +783,7 @@ class DataFilter:
             return data_prepared.groupby("user_id")  # type: ignore
         except Exception as e:
             raise ValueError(f"Error sorting data: {e}")
+
 
 
 class LabelsCalc:
@@ -765,8 +811,10 @@ class LabelsCalc:
         output_path : str
             Path to save generated plots and outputs.
         """
+
         self.pdf_object = pdf_object
         self.output_path = output_path
+
 
     def _add_pdf_cell(self, txt_to_add: str) -> None:
         """
@@ -777,7 +825,9 @@ class LabelsCalc:
         txt_to_add : str
             Text to be added to the PDF document.
         """
+
         self.pdf_object.cell(200, 5, text=txt_to_add, ln=True, align="L")
+
 
     def _add_pdf_plot(
         self,
@@ -800,6 +850,7 @@ class LabelsCalc:
         x_position : int, optional
             X-coordinate position of the plot, by default 10.
         """
+
         try:
             y_position = self.pdf_object.get_y()
             self.pdf_object.image(
@@ -813,6 +864,7 @@ class LabelsCalc:
             plot_obj.close()
         except Exception as e:
             raise RuntimeError(f"Failed to add plot to PDF: {e}")
+
 
     def _compute_intervals(
         self, labels: list, times: np.ndarray, max_time_between: int = const.MAX_TIME_BETWEEN
@@ -835,6 +887,7 @@ class LabelsCalc:
         list : A list of intervals with columns: label, start_time, end_time,
             latitude, longitude.
         """
+
         trajectory = np.hstack([labels.reshape(-1, 1), times.reshape(-1, 3)])  # type: ignore
         final_trajectory = []
 
@@ -851,7 +904,9 @@ class LabelsCalc:
             loc_prev = loc
         if loc_prev == -1:
             final_trajectory.append([loc_prev, lat, lon, t_start, t_end])
+
         return final_trajectory
+
 
     def _process_combination(self, args: list) -> dict:
         """
@@ -866,6 +921,7 @@ class LabelsCalc:
         -------
         dict : Results containing user ID, trajectories, and parameter values.
         """
+
         user_id, group, r1, r2, min_staying_time = args
 
         try:
@@ -917,6 +973,7 @@ class LabelsCalc:
         except Exception as e:
             raise RuntimeError(f"Error processing user {args[0]}: {e}")
 
+
     def _calc_params_matrix_parallel(
             self, data: pd.DataFrame
         ) -> pd.DataFrame:
@@ -933,6 +990,7 @@ class LabelsCalc:
         pd.DataFrame
             A DataFrame with sensitivity analysis results.
         """
+
         try:
             rs1 = np.logspace(1, 2, 20, base=50)
             rs2 = np.logspace(1, 2, 20, base=50)
@@ -967,6 +1025,7 @@ class LabelsCalc:
             raise RuntimeError(f"Error calculating parameter matrix in "
                                f"parallel: {e}")
 
+
     def _calc_params_matrix(self, data: pd.DataFrame) -> pd.DataFrame:
         """
         Calculate the parameter sensitivity matrix.
@@ -981,6 +1040,7 @@ class LabelsCalc:
         pd.DataFrame
             A DataFrame with sensitivity analysis results.
         """
+
         rs1 = np.logspace(1, 2, 20, base=50)
         rs2 = np.logspace(1, 2, 20, base=50)
         min_staying_times = np.logspace(np.log10(600), np.log10(7200), num=20)
@@ -1026,6 +1086,7 @@ class LabelsCalc:
 
         return pd.DataFrame(dfs_list)
 
+
     def _plot_param(
         self,
         param: str,
@@ -1055,6 +1116,7 @@ class LabelsCalc:
         BytesIO
             A BytesIO object containing the plot image.
         """
+
         fig, ax1 = plt.subplots(figsize=(25, 20))
         ax1.plot(x, y, "o", label="Original data", linestyle="-", linewidth=2)
         ax1.axvline(
@@ -1086,7 +1148,9 @@ class LabelsCalc:
         plt.savefig(buffer, format="png")
         plt.close()
         buffer.seek(0)
+
         return buffer
+
 
     def _choose_param_value(self, data: pd.DataFrame, param: str) -> float:
         """
@@ -1146,8 +1210,9 @@ class LabelsCalc:
         return stabilization_point_index
 
 
-
-    def _choose_param_value_with_clustering_params(self, data: pd.DataFrame, param: str) -> float:
+    def _choose_param_value_with_clustering_params(
+            self, data: pd.DataFrame, param: str
+        ) -> float:
         """
         Choose the optimal value for a given parameter based on
         the sensitivity matrix.
@@ -1209,6 +1274,7 @@ class LabelsCalc:
 
         return stabilization_point_index
 
+
     def _plot_param_with_clustering_measures(
         self,
         param: str,
@@ -1242,6 +1308,7 @@ class LabelsCalc:
         plt.savefig(buffer, format="png")
         plt.close()
         buffer.seek(0)
+
         return buffer
 
 
@@ -1267,6 +1334,7 @@ class LabelsCalc:
         Tuple[float, float, float]
             A tuple containing the selected values for R1, R2, and Tmin.
         """
+
         try:
             r1 = self._choose_param_value(sensitivity_matrix, "R1")
             self.pdf_object.add_page()
@@ -1278,7 +1346,34 @@ class LabelsCalc:
         except Exception as e:
             raise RuntimeError(f"Error selecting best parameters: {e}")
 
-    def _calc_labels(self, data, r1, r2, Tmin):
+
+    def _calc_labels(
+            self, data, r1: float, r2: float, Tmin: int
+        ) -> pd.DataFrame:
+        """
+        Calculates stop location labels for trajectory data using
+        the Infostop model.
+
+        Args:
+            data (iterable): Iterable containing user_id and associated
+                trajectory data.
+            r1 (float): Primary clustering radius for Infostop.
+            r2 (float): Secondary clustering radius for merging clusters.
+            Tmin (int): Minimum duration (in seconds) for a stop to
+                be considered valid.
+
+        Returns:
+            pd.DataFrame: DataFrame containing labeled stop locations
+                with the following columns:
+                - 'animal_id': The ID of the tracked individual.
+                - 'labels': Cluster labels assigned to stop locations.
+                - 'lat': Latitude of each recorded point.
+                - 'lon': Longitude of each recorded point.
+                - 'time': Timestamp of each recorded point.
+
+        Raises:
+            ValueError: If the input data format is invalid.
+        """
         results = []
         for user_id, group in tqdm(data, total=len(data)):
             group = group.sort_values("time")
@@ -1406,6 +1501,7 @@ class InfoStopData:
             Exception: For any unexpected errors that occur during
                 the process.
         """
+
         raport = DataAnalystInfostop(self.pdf, self.output_dir_animal)
         filter = DataFilter(self.pdf)
         labels_calculator = LabelsCalc(self.pdf, self.output_dir_animal)
