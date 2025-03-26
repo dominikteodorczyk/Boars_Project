@@ -19,7 +19,19 @@ OUTPUT_DIR = "scaling_laws_output"
 
 
 def main():
+    """
+    Main function of the script processing animal trajectory data.
 
+    The script performs the following steps:
+    1. Retrieves file paths from the input data directory.
+    2. Creates an output directory for analysis results.
+    3. Initializes an object to store dataset statistics.
+    4. Iterates through files, loads and processes the data, and then performs
+        scaling law calculations.
+    5. Exports dataset statistics to a CSV file.
+
+    In case of errors, logs them and continues processing the next files.
+    """
     try:
         # Retrieve file paths from the data directory
         file_paths = get_file_paths(INFOSTOP_DATA_DIR)
