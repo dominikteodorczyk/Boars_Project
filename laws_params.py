@@ -1,3 +1,19 @@
+"""
+Script for processing animal trajectory data and performing scaling
+law calculations.
+
+This script:
+- Loads trajectory data files from a specified directory.
+- Creates an output directory for storing analysis results.
+- Processes each file to clean and structure the data.
+- Applies scaling law calculations to the data.
+- Saves the processed statistics to a CSV file.
+
+If an error occurs during processing, it is logged, and the script continues
+with the next file.
+"""
+
+
 import os
 import glob
 import logging
