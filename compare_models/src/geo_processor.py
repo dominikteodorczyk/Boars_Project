@@ -75,3 +75,7 @@ class GeoProcessor:
         centroids = df["centroid"].apply(lambda point: (point.x, point.y)).tolist()
         dist_matrix = distance.cdist(centroids, centroids)
         return pd.DataFrame(dist_matrix, index=df["tessellation_id"], columns=df["tessellation_id"])
+
+    def jump_lengths(self, df: gpd.GeoDataFrame) -> pd.Series:
+        jumps = df.dropna().geometry.groupby(level=0).progress_apply(lambda x: x.distance(x.shift()))
+        return jumps
