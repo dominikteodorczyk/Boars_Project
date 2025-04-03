@@ -198,7 +198,8 @@ def compute_emd(org_traj, syn_traj, tessellation):
 def plot_emd(data_list, label_list, output_dir, file_name):
     colors = {
         "EPR": "blue",
-        "RandomWalk": "red"
+        "RandomWalk": "red",
+        "LevyFlight": "green"
     }
     plt.figure(figsize=(15, 15))
     for data, label in zip(data_list, label_list):
