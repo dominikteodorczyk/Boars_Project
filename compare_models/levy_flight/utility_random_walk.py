@@ -2,8 +2,7 @@ import numpy as np
 from numba import njit
 
 
-@njit
-def random_walk_fast_2d(step_size, phi, box_size, x_start, y_start, periodic, length):
+def random_walk_fast_2d(model, step_size, phi, box_size, box_size_x, box_size_y, x_start, y_start, periodic, length):
     """Python implementation of a 2D random walk with periodic boundary conditions.
 
     Parameters
@@ -38,20 +37,47 @@ def random_walk_fast_2d(step_size, phi, box_size, x_start, y_start, periodic, le
     y[0] = y_start
 
     for i in range(length):
-        # Calculate step
-        dx = step_size[i] * np.cos(phi[i])
-        dy = step_size[i] * np.sin(phi[i])
+        valid_step = False
+        while not valid_step:
+            # Generate new step
+            step = model.generate(1)[0]
+            phi = np.random.uniform(0., 2. * np.pi)
 
-        # Update positions
-        x[i + 1] = x[i] + dx
-        y[i + 1] = y[i] + dy
+            dx = step * np.cos(phi)
+            dy = step * np.sin(phi)
 
-        # Apply periodic boundary conditions
-        if periodic:
-            x[i + 1] %= box_size
-            y[i + 1] %= box_size
+            new_x = x[i] + dx
+            new_y = y[i] + dy
+
+            if periodic:
+                # Apply periodic boundary conditions
+                new_x %= box_size_x
+                new_y %= box_size_y
+                valid_step = True  # Always valid in periodic conditions
+            else:
+                # Reflecting boundary conditions
+                if 0 <= new_x <= box_size_x and 0 <= new_y <= box_size_y:
+                    valid_step = True  # Step is valid
+
+            # Update positions
+        x[i + 1] = new_x
+        y[i + 1] = new_y
 
     return x, y
+    #     # Calculate step
+    #     dx = step_size[i] * np.cos(phi[i])
+    #     dy = step_size[i] * np.sin(phi[i])
+    #
+    #     # Update positions
+    #     x[i + 1] = x[i] + dx
+    #     y[i + 1] = y[i] + dy
+    #
+    #     # Apply periodic boundary conditions
+    #     if periodic:
+    #         x[i + 1] %= box_size_x
+    #         y[i + 1] %= box_size_y
+    #
+    # return x, y
 
 
 @njit

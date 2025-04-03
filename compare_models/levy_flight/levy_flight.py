@@ -31,7 +31,7 @@ def _get_randoms_sphere(size):
     return phi, theta
 
 
-def get_random_flight(steps, mode='3D', box_size=75., periodic=True):
+def get_random_flight(model, steps, mode='3D', box_size=75., box_size_x=10, box_size_y=10, periodic=True):
     """Generates a random realisation of a 'Levy flight'-like distribution. The random step sizes are defined by the
     user.
 
@@ -64,15 +64,15 @@ def get_random_flight(steps, mode='3D', box_size=75., periodic=True):
         box_size = None
     if mode == '2D':
         if box_size is None:
-            _x_start, _y_start = 0., 0.
+            _x_start, _y_start = np.random.uniform(0., box_size_x, 1)[0], np.random.uniform(0., box_size_y, 1)[0]
             _periodic = 0
             box_size = 0.
         else:
-            _x_start = np.random.uniform(0., box_size, 1)[0]
-            _y_start = np.random.uniform(0., box_size, 1)[0]
+            _x_start = np.random.uniform(0., box_size_x, 1)[0]
+            _y_start = np.random.uniform(0., box_size_y, 1)[0]
             _periodic = 1
         _phi = np.random.uniform(0., 2. * np.pi, _size)
-        x, y = random_walk.random_walk_fast_2d(steps, _phi, box_size, _x_start, _y_start, _periodic, _size)
+        x, y = random_walk.random_walk_fast_2d(model, steps, _phi, box_size, box_size_x, box_size_y, _x_start, _y_start, _periodic, _size)
         return x, y
     elif mode == '3D':
         if box_size is None:
