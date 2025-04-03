@@ -4,7 +4,7 @@ This repository contains the source code and tools used in the **Boars_Project**
 
 ## Description
 
-The project focuses on **[describe the main goal, e.g., analyzing wild boar migration patterns, studying their population, etc.]**.
+The project focuses on analyzing wild boar migration patterns, studying their population.
 It includes scripts for data parsing, calculations, and analysis related to wild boars.
 
 ## Directory Structure
