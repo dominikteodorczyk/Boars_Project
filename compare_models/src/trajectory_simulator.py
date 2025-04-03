@@ -6,6 +6,7 @@ from humobi.tools.user_statistics import user_trajectories_duration
 from epr_trajectory import EPRTrajectory
 from logger import Logger
 from random_walk_trajectory import RandomWalkTrajectory
+from levy_flight_trajectory import LevyFlightTrajectory
 
 
 class TrajectorySimulator:
@@ -31,6 +32,7 @@ class TrajectorySimulator:
 
         self.epr_trajectory = EPRTrajectory(config_manager, filtered_data_means, resampled_gdf, tessellation, starting_positions, self.start_time, self.end_time, self.n_agents, self.output_dir_path)
         self.random_walk_trajectory = RandomWalkTrajectory(config_manager, grid_size, tessellation, self.n_agents, self.start_time, self.steps, self.output_dir_path)
+        self.levy_flight_trajectory = LevyFlightTrajectory("LevyFlight", filtered_data_means, tessellation, self.n_agents, self.start_time, self.steps, self.output_dir_path)
 
     def get_users_list(self, df: pd.DataFrame):
         return list(df.groupby(level=0).groups.keys())
@@ -60,8 +62,8 @@ class TrajectorySimulator:
             trajectory.set_index(['animal_id', 'time'], inplace=True)
             trajectory.to_file(os.path.join(self.output_dir_path, 'rw_generated_' + self.file_name + '.geojson'), driver='GeoJSON')
             return trajectory
-        # elif model_name == "LevyFlight":
-        #     levy_flight_trajectory = LevyFlightTrajectory("LevyFlight")
-        #     levy_flight_trajectory.generate_trajectory()
-        # else:
-        #     print("Model not found")
+        elif model_name == "LevyFlight":
+            trajectory = self.levy_flight_trajectory.generate_trajectory()
+            trajectory.set_index(['animal_id', 'time'], inplace=True)
+            trajectory.to_file(os.path.join(self.output_dir_path, 'lf_generated_' + self.file_name + '.geojson'), driver='GeoJSON')
+            return trajectory
