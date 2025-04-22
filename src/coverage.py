@@ -6,13 +6,6 @@ This module provides the CoverageSampler class, which allows you to:
 - Load a set of GPS trajectories from file
 - Sample the raster values at trajectory point locations
 - Return a GeoDataFrame with coverage values for each point
-
-Example:
-    >>> from src.coverage import CoverageSampler
-    >>> cs = CoverageSampler()
-    >>> cs.read_raster("land_cover.tif", crs=2180)
-    >>> cs.read_trajectiories("animals.csv", crs=4326)
-    >>> results = cs.get_coverage()
 """
 
 import pandas as pd
@@ -27,6 +20,12 @@ class CoverageSampler:
     This is useful for spatiotemporal ecological analyses, such as linking
     animal movement data with environmental variables (e.g., land cover,
     elevation).
+
+    Example:
+    >>> cs = CoverageSampler()
+    >>> cs.read_raster("land_cover.tif", crs=2180)
+    >>> cs.read_trajectiories("animals.csv", crs=4326)
+    >>> results = cs.get_coverage()
     """
     def __init__(self) -> None:
         self.raster_obj = rs.DatasetBase
