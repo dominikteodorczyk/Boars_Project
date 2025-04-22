@@ -1,16 +1,35 @@
-import pandas as pd
-from geopy.distance import geodesic
+"""
+Module for calculating coefficients of association (Ca) between
+moving agents based on spatiotemporal proximity.
+
+Includes:
+- `EventCa`: Calculates event-based Ca based on shared proximity
+    in space and time.
+- `TimeCa`: Calculates time-based Ca based on duration of shared
+    proximity.
+"""
+
 from datetime import timedelta
 from itertools import combinations, permutations
-
+import pandas as pd
+from geopy.distance import geodesic
 
 class CoeffAssociation:
-
+    """
+    Base class for association coefficient computation between
+    individuals. Handles input formatting and user extraction.
+    """
     def __init__(self) -> None:
         self.data = pd.DataFrame()
         pass
 
     def _get_users(self) -> list:
+        """
+        Extracts unique user IDs from the dataset.
+
+        Returns:
+            list: List of unique user IDs.
+        """
         users = self.data.user_id.unique()
         return list(users)
 
@@ -22,14 +41,38 @@ class CoeffAssociation:
         lat: str = "lat",
         lon: str = "lon",
     ) -> None:
+        """
+        Loads and standardizes input tracking data.
 
+        Args:
+            data (pd.DataFrame): Input dataframe with tracking data.
+            id_col (str): Name of the column with individual/user IDs.
+            timestamp (str): Name of the timestamp column.
+            lat (str): Name of the latitude column.
+            lon (str): Name of the longitude column.
+        """
         self.data = data.rename(
-            columns={id_col: "user_id", timestamp: "datetime", lat: "lat", lon: "lon"}
+            columns={
+                id_col: "user_id",
+                timestamp: "datetime",
+                lat: "lat",
+                lon: "lon"
+            }
         )
         self.data["datetime"] = pd.to_datetime(self.data["datetime"])
 
 
 class EventCa(CoeffAssociation):
+    """
+    Calculates event-based Coefficient of Association (Ca).
+    Based on the number of meetings between individuals that fall
+    within both a temporal and spatial threshold.
+
+    Example:
+    >>> ca = EventCa()
+    >>> ca.input_data(data)
+    >>> result = ca.compute(temporal=3600, distance=1000)
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -37,6 +80,19 @@ class EventCa(CoeffAssociation):
     def _calc_meetings_values(
         self, main_agent, secound_agent, td: timedelta, dd: int
     ) -> tuple:
+        """
+        Calculates number of events (meetings) between two individuals
+        using iteration.
+
+        Args:
+            main_agent: ID of the main individual.
+            secound_agent: ID of the secondary individual.
+            td (timedelta): Maximum time difference to consider a meeting.
+            dd (int): Maximum spatial distance (in meters).
+
+        Returns:
+            tuple: (Number of meetings, Missed events)
+        """
         m_agent_data = (
             self.data[self.data["user_id"] == main_agent]
             .reset_index(drop=True)
@@ -61,7 +117,9 @@ class EventCa(CoeffAssociation):
                 temp_dataframe["datetime"] - temp_dataframe["m_datetime"]
             )
 
-            filtred_dataframe = temp_dataframe[temp_dataframe["time_diff"] <= td]
+            filtred_dataframe = temp_dataframe[
+                temp_dataframe["time_diff"] <= td
+            ]
             if filtred_dataframe.shape[0] > 0:
                 filtred_dataframe = filtred_dataframe.copy()
                 filtred_dataframe.loc[:, "distance"] = filtred_dataframe.apply(
@@ -70,10 +128,11 @@ class EventCa(CoeffAssociation):
                     ).meters,
                     axis=1,
                 )
-                final_dataframe = filtred_dataframe[filtred_dataframe["distance"] <= dd]
+                final_dataframe = filtred_dataframe[
+                    filtred_dataframe["distance"] <= dd
+                ]
                 if final_dataframe.shape[0] > 0:
                     am_value += 1
-                    # m_value += temp_dataframe.shape[0] - final_dataframe.shape[0]
             else:
                 m_value += 1
 
@@ -82,6 +141,18 @@ class EventCa(CoeffAssociation):
     def _calc_meetings_values_vector(
         self, main_agent, secound_agent, td: int, dd: int
     ) -> tuple:
+        """
+        Optimized vectorized version for calculating meetings.
+
+        Args:
+            main_agent: ID of the main individual.
+            secound_agent: ID of the secondary individual.
+            td (int): Time threshold in seconds.
+            dd (int): Distance threshold in meters.
+
+        Returns:
+            tuple: (Number of meetings, Missed events)
+        """
         m_agent_data = (
             self.data[self.data["user_id"] == main_agent]
             .reset_index(drop=True)
@@ -103,7 +174,9 @@ class EventCa(CoeffAssociation):
             for s_row in s_agent_data:
                 if abs(m_row[0] - s_row[0]) <= td:
                     if (
-                        geodesic((s_row[3], s_row[2]), (m_row[3], m_row[2])).meters
+                        geodesic(
+                            (s_row[3], s_row[2]), (m_row[3], m_row[2])
+                        ).meters
                         <= dd
                     ):
                         am_value += 1
@@ -112,7 +185,21 @@ class EventCa(CoeffAssociation):
         m_value = m_agent_data.shape[0] - am_value
         return am_value, m_value
 
-    def _compute_pair_ca(self, main_agent, secound_agent, td: int, dd: int):
+    def _compute_pair_ca(
+            self, main_agent, secound_agent, td: int, dd: int
+        ) -> tuple:
+        """
+        Computes the association coefficient between two individuals.
+
+        Args:
+            main_agent: ID of the first individual.
+            secound_agent: ID of the second individual.
+            td (int): Time threshold in seconds.
+            dd (int): Distance threshold in meters.
+
+        Returns:
+            tuple: (Ca value, AB1 count, AB2 count, A-only, B-only)
+        """
         time_threshold = timedelta(seconds=td)
 
         ab1, a_only = self._calc_meetings_values_vector(
@@ -126,11 +213,28 @@ class EventCa(CoeffAssociation):
             return (2 * ab2) / denominator, ab1, ab2, a_only, b_only
         elif denominator == 0:
             return 1.0, ab1, ab2, a_only, b_only
+        else:
+            return 0, ab1, ab2, a_only, b_only
 
-    def compute(self, temporal: int = 3600, distance: int = 1000):
+    def compute(
+            self, temporal: int = 3600, distance: int = 1000
+        ) -> pd.DataFrame:
+        """
+        Computes pairwise event-based Ca for all unique user pairs.
+
+        Args:
+            temporal (int): Time threshold in seconds (default: 3600).
+            distance (int): Distance threshold in meters (default: 1000).
+
+        Returns:
+            pd.DataFrame: Result dataframe with
+                columns [A, B, Ca, AB1, AB2, A-only, B-only]
+        """
         users = self._get_users()
         pairs = list(combinations(users, 2))
-        results_frame = pd.DataFrame(columns=["A", "B", "Ca", "AB1", "AB2", "A", "B"])
+        results_frame = pd.DataFrame(
+            columns=["A", "B", "Ca", "AB1", "AB2", "A", "B"]
+        )
         for users in pairs:
             ca, ab1, ab2, a_only, b_only = self._compute_pair_ca(
                 users[0], users[1], temporal, distance
@@ -149,21 +253,41 @@ class EventCa(CoeffAssociation):
 
 
 class TimeCa(CoeffAssociation):
+    """
+    Calculates time-based Coefficient of Association (Ca).
+    Based on overlapping durations where individuals are close in space.
 
+    Example:
+    >>> ca = TimeCa()
+    >>> ca.input_data(data)
+    >>> result = ca.compute(distance=1000)
+    """
     def __init__(self) -> None:
         super().__init__()
 
-    def _calc_meetings_values(self, main_agent, secound_agent, dd: int) -> tuple:
+    def _calc_meetings_values(
+            self, main_agent, secound_agent, dd: int
+        ) -> tuple:
+        """
+        Computes the duration of co-location between two individuals.
 
-        m_agent_data = self.data[self.data["user_id"] == main_agent].sort_values(
-            "datetime"
-        )
+        Args:
+            main_agent: ID of the first individual.
+            secound_agent: ID of the second individual.
+            dd (int): Distance threshold in meters.
+
+        Returns:
+            tuple: (Total observation time, Time together, Ca value)
+        """
+        m_agent_data = self.data[
+            self.data["user_id"] == main_agent
+        ].sort_values("datetime")
         m_agent_data["start"] = m_agent_data["datetime"]
         m_agent_data["end"] = m_agent_data["datetime"].shift(-1)
 
-        s_agent_data = self.data[self.data["user_id"] == secound_agent].sort_values(
-            "datetime"
-        )
+        s_agent_data = self.data[
+            self.data["user_id"] == secound_agent
+        ].sort_values("datetime")
         s_agent_data["start"] = s_agent_data["datetime"]
         s_agent_data["end"] = s_agent_data["datetime"].shift(-1)
 
@@ -177,7 +301,8 @@ class TimeCa(CoeffAssociation):
             if df_time_sort.shape[0] != 0:
                 for _sort, row_sort in df_time_sort.iterrows():
                     distance = geodesic(
-                        (row_sort["lat"], row_sort["lon"]), (row["lat"], row["lon"])
+                        (row_sort["lat"], row_sort["lon"]),
+                        (row["lat"], row["lon"])
                     ).meters
                     if distance <= dd:
 
@@ -191,7 +316,17 @@ class TimeCa(CoeffAssociation):
 
         return max_time, time_together, ca
 
-    def compute(self, distance: int = 1000):
+    def compute(self, distance: int = 1000) -> pd.DataFrame:
+        """
+        Computes pairwise time-based Ca for all user permutations.
+
+        Args:
+            distance (int): Distance threshold in meters.
+
+        Returns:
+            pd.DataFrame: Result dataframe with
+                columns [A, B, MaxTime, TimeTogether, Ca]
+        """
         users = self._get_users()
         pairs = list(permutations(users, 2))
         results_frame = pd.DataFrame(
