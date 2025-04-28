@@ -3375,10 +3375,15 @@ class Laws:
         gamma = gamma_est
         rho = rho_est
 
+
         DeltaS = S_array[1:] - S_array[:-1]
         S_mid = S_array[:-1]
         slope = -gamma
-        intercept = np.log(rho)
+        intercept = temp
+
+        mask = (DeltaS > 0) & (S_mid > 0)
+        DeltaS = DeltaS[mask]
+        S_mid = S_mid[mask]
 
         # S_t = np.array(S_t)
         # DeltaS = S_t[1:] - S_t[:-1]
