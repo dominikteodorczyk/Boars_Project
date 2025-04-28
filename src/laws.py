@@ -51,6 +51,7 @@ import geopandas as gpd
 from shapely.geometry import Point
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
+import powerlaw
 
 
 sns.set_style("whitegrid")
@@ -1163,12 +1164,12 @@ class Prepocessing:
             group["next"] = group.labels != group.labels.shift()
             group["moved"] = group.next.cumsum()
             (group.groupby("moved").duration.sum() / 3600).describe()
-            group["duration"].fillna(3600, inplace=True)
+            group['duration'] = group['duration'].fillna(3600)
 
-            group_resampled = group.resample("1H").apply(longest_visited_row).unstack()
+            group_resampled = group.resample("1h").apply(longest_visited_row).unstack()
             if group_resampled.index.nlevels > 1:
-                group_resampled = group.resample("1H").apply(longest_visited_row)
-            group_resampled = group_resampled.resample("1H").first()
+                group_resampled = group.resample("1h").apply(longest_visited_row)
+            group_resampled = group_resampled.resample("1h").first()
             group_resampled = group_resampled.ffill().bfill()
 
             to_conca[uid] = group_resampled
@@ -3314,7 +3315,7 @@ class Laws:
 
 
     @log_pnew_estimation
-    def estimate_pnew(self, nrows:int, n_data:int, S_t:ndarray) -> tuple:
+    def estimate_pnew(self, filled_data:pd.DataFrame) -> tuple:
         """
         Estimates parameters (rho, gamma) for the probability of
         discovering new locations.
@@ -3344,34 +3345,68 @@ class Laws:
             - nrows (int): Number of rows in the dataset.
             - n_data (int): Total data points available.
         """
+        filled_data.to_csv("filled_data.csv")
+        nrows = int(filled_data.groupby(level=0).apply(lambda x: len(x)).min())
+        t_array = np.arange(1, nrows + 1)
 
-        S_t = np.array(S_t)
-        DeltaS = S_t[1:] - S_t[:-1]
-        S_mid = S_t[:-1]
-        mask = (DeltaS > 0) & (S_mid > 0)
-        DeltaS = DeltaS[mask]
-        S_mid = S_mid[mask]
+        n_array = filled_data.next.groupby(level=0).apply(lambda x: x.cumsum())
+        n_array = np.array([n_array.groupby(level=0).nth(x).mean() for x in range(nrows)])
 
-        X = np.log(S_mid).reshape(-1, 1)  # predictor
-        y = np.log(DeltaS)  # response
 
-        model = LinearRegression()
-        model.fit(X, y)
+        S_array = np.array([filled_data.groupby(level=0)['new_sum'].nth(x).mean() for x in range(nrows)])
 
-        slope = model.coef_[0]
-        intercept = model.intercept_
-        gamma_est = -slope
-        rho_est = np.exp(intercept)
+        fit_n = powerlaw.Fit(n_array + 1e-10, discrete=True, verbose=False)
+        beta_est = fit_n.power_law.alpha - 1
+        C_est = np.exp(np.mean(np.log(n_array + 1e-10) - beta_est * np.log(t_array)))
+
+        fit_s = powerlaw.Fit(S_array + 1e-10, discrete=True, verbose=False)
+        alpha_est = fit_s.power_law.alpha - 1
+        K_est = np.exp(np.mean(np.log(S_array + 1e-10) - alpha_est * np.log(t_array)))
+
+        # Gamma from theory
+        gamma_est = beta_est / alpha_est - 1
+
+        # Estimate rho from prefactor relation
+        num = np.log(K_est) - np.log(1 + gamma_est)
+        den = 1.0 / (1.0 + gamma_est)
+        temp = num / den - np.log(C_est)
+        rho_est = np.exp(temp)
+
+        gamma = gamma_est
+        rho = rho_est
+
+        DeltaS = S_array[1:] - S_array[:-1]
+        S_mid = S_array[:-1]
+        slope = -gamma
+        intercept = np.log(rho)
+
+        # S_t = np.array(S_t)
+        # DeltaS = S_t[1:] - S_t[:-1]
+        # S_mid = S_t[:-1]
+        # mask = (DeltaS > 0) & (S_mid > 0)
+        # DeltaS = DeltaS[mask]
+        # S_mid = S_mid[mask]
+
+        # X = np.log(S_mid).reshape(-1, 1)  # predictor
+        # y = np.log(DeltaS)  # response
+
+        # model = LinearRegression()
+        # model.fit(X, y)
+
+        # slope = model.coef_[0]
+        # intercept = model.intercept_
+        # gamma_est = -slope
+        # rho_est = np.exp(intercept)
 
         return (
-            rho_est,
-            gamma_est,
+            rho,
+            gamma,
             DeltaS,
             S_mid,
             intercept,
             slope,
             nrows,
-            n_data
+            t_array
             )
 
 
@@ -3553,7 +3588,6 @@ class ScalingLawsCalc:
             .set_index("user_id")
         )
         filled_data = preproc.filing_data(data)
-
         nrows = int(filled_data.groupby(level=0).apply(lambda x: len(x)).min())
         n_data = np.arange(1, nrows + 1)
         S_data = [
@@ -3609,7 +3643,7 @@ class ScalingLawsCalc:
         laws.msd_distribution(filtered_animals)
         # laws.return_time_distribution(filtered_animals)
         # laws.exploration_time(filtered_animals)
-        laws.estimate_pnew(nrows, n_data, S_data)
+        laws.estimate_pnew(filled_data)
 
         pdf_path = os.path.join(
             self.output_dir_animal, f"{self.animal_name}.pdf"
