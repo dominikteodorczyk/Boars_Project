@@ -11,8 +11,13 @@ Includes:
 
 from datetime import timedelta
 from itertools import combinations, permutations
+import time
 import pandas as pd
+import numpy as np
 from geopy.distance import geodesic
+from sklearn import preprocessing
+from intervaltree import IntervalTree
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 class CoeffAssociation:
     """
@@ -266,8 +271,8 @@ class TimeCa(CoeffAssociation):
         super().__init__()
 
     def _calc_meetings_values(
-            self, main_agent, secound_agent, dd: int
-        ) -> tuple:
+            self, main_agent, secound_agent
+        ) -> float:
         """
         Computes the duration of co-location between two individuals.
 
@@ -291,7 +296,8 @@ class TimeCa(CoeffAssociation):
         s_agent_data["start"] = s_agent_data["datetime"]
         s_agent_data["end"] = s_agent_data["datetime"].shift(-1)
 
-        time_together = timedelta(0)
+        distances = []
+        time_together = []
         for _, row in m_agent_data.iterrows():
             df_time_sort = s_agent_data[
                 (s_agent_data["start"] < row["end"])
@@ -304,19 +310,29 @@ class TimeCa(CoeffAssociation):
                         (row_sort["lat"], row_sort["lon"]),
                         (row["lat"], row["lon"])
                     ).meters
-                    if distance <= dd:
 
-                        common_start = max(row["start"], row_sort["start"])
-                        common_end = min(row["end"], row_sort["end"])
-                        period = common_end - common_start
-                        time_together += period
+                    common_start = max(row["start"], row_sort["start"])
+                    common_end = min(row["end"], row_sort["end"])
+                    period = common_end - common_start
 
-        max_time = m_agent_data["end"].max() - m_agent_data["start"].min()
-        ca = int(time_together.total_seconds()) / int(max_time.total_seconds())
+                    distances.append(distance)
+                    time_together.append(period)
 
-        return max_time, time_together, ca
+        # max_time = (m_agent_data["end"].max() - m_agent_data["start"].min()).total_seconds()
+        ca = 0
+        if distances and time_together:
+            dmax = max(distances)
+            tsum = np.sum(time_together)
+            for i in range(len(time_together)):
+                ca += distances[i]/dmax * (time_together[i]/tsum)
 
-    def compute(self, distance: int = 1000) -> pd.DataFrame:
+            return 1-ca
+        else:
+            return 0.0
+
+
+
+    def compute(self) -> pd.DataFrame:
         """
         Computes pairwise time-based Ca for all user permutations.
 
@@ -330,20 +346,101 @@ class TimeCa(CoeffAssociation):
         users = self._get_users()
         pairs = list(permutations(users, 2))
         results_frame = pd.DataFrame(
-            columns=["A", "B", "MaxTime", "TimeTogether", "Ca"]
+            columns=["A", "B", "Ca"]
         )
         for users in pairs:
-            max_time, time_together, ca = self._calc_meetings_values(
-                users[0], users[1], distance
+            ca = self._calc_meetings_values(
+                users[0], users[1]
             )
             results_frame = pd.concat(
                 [
                     results_frame,
                     pd.DataFrame(
-                        [[users[0], users[1], max_time, time_together, ca]],
-                        columns=["A", "B", "MaxTime", "TimeTogether", "Ca"],
+                        [[users[0], users[1], ca]],
+                        columns=["A", "B", "Ca"],
                     ),
                 ],
                 ignore_index=True,
             )
+        results_frame.sort_values('Ca')
         return results_frame
+
+    def compute2(self) -> pd.DataFrame:
+        """
+        Computes pairwise time-based Ca for all user permutations using parallel processing.
+
+        Returns:
+            pd.DataFrame: DataFrame with columns [A, B, Ca]
+        """
+        users = self._get_users()
+        pairs = list(combinations(users, 2))
+        data = self.data.copy(deep=True)
+
+        # Zbuduj argumenty jako krotki (data, pair)
+        args_list = [(data, pair) for pair in pairs]
+
+        results = []
+        with ProcessPoolExecutor() as executor:
+            futures = [executor.submit(meeting_worker, args) for args in args_list]
+            for future in as_completed(futures):
+                results.append(future.result())
+
+        results_frame = pd.DataFrame(results, columns=["A", "B", "Ca"])
+        results_frame = results_frame.sort_values("Ca", ascending=False).reset_index(drop=True)
+        return results_frame
+
+def meeting_worker(args):
+    data, pair = args
+    a, b = pair
+    try:
+        ca = calc_meeting_wrapper(data, a, b)
+        return (a, b, ca)
+    except Exception as e:
+        return (a, b, 0)  # Możesz dać NaN
+
+
+def calc_meeting_wrapper(data, main_agent, second_agent):
+    m_agent_data = data[data["user_id"] == main_agent].sort_values("datetime").copy()
+    m_agent_data["start"] = m_agent_data["datetime"]
+    m_agent_data["end"] = m_agent_data["datetime"].shift(-1)
+
+    s_agent_data = data[data["user_id"] == second_agent].sort_values("datetime").copy()
+    s_agent_data["start"] = s_agent_data["datetime"]
+    s_agent_data["end"] = s_agent_data["datetime"].shift(-1)
+
+    # Usuń zerowe przedziały
+    m_agent_data = m_agent_data[m_agent_data["start"] < m_agent_data["end"]]
+    s_agent_data = s_agent_data[s_agent_data["start"] < s_agent_data["end"]]
+
+    distances = []
+    time_together = []
+
+    for _, row in m_agent_data.iterrows():
+        df_time_sort = s_agent_data[
+            (s_agent_data["start"] < row["end"])
+            & (s_agent_data["end"] > row["start"])
+        ]
+
+        for _, row_sort in df_time_sort.iterrows():
+            distance = geodesic(
+                (row_sort["lat"], row_sort["lon"]),
+                (row["lat"], row["lon"])
+            ).meters
+
+            common_start = max(row["start"], row_sort["start"])
+            common_end = min(row["end"], row_sort["end"])
+            period = (common_end - common_start).total_seconds()
+
+            if period > 0:
+                distances.append(distance)
+                time_together.append(period)
+
+    ca = 0.0
+    if distances and time_together:
+        dmax = max(distances)
+        tsum = np.sum(time_together)
+        for i in range(len(time_together)):
+            ca += distances[i]/dmax * (time_together[i]/tsum)
+        return 1 - ca
+    else:
+        return 0.0
