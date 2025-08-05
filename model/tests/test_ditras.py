@@ -5,6 +5,8 @@ import geopandas as gpd
 from shapely.geometry import Point
 from scipy.sparse import lil_matrix
 import pandas as pd
+from unittest.mock import patch
+from pydantic import ValidationError
 
 from model.src.EPR import EPRConfig, Ditras
 
@@ -155,3 +157,51 @@ def test_long_simulation_buffer(ditras_instance, dummy_tessellation):
     assert ditras_instance.trajectories[0][2] == start  # first timestamp
     assert ditras_instance.trajectories[-1][2] == last_timestamp  # last timestamp
     assert len(ditras_instance.trajectories) == 48  # one row per hour
+
+
+def test_attractiveness_raster_applied(dummy_tessellation, dummy_diary):
+    """Raster values should modify the tessellation relevance column when enabled."""
+    from model.src.EPR import Ditras, EPRConfig
+
+    cfg = EPRConfig(
+        simulation_with_attractiveness_raster=True,
+        attractiveness_raster_path="dummy_raster.tif"
+    )
+    model = Ditras(cfg, diary_generator=dummy_diary)
+
+    # Patch rasterio.open and zonal_stats
+    with patch("model.src.EPR.rasterio.open") as mock_raster_open, \
+            patch("model.src.EPR.zonal_stats") as mock_zonal_stats:
+        # Simulate raster file's nodata
+        mock_raster_open.return_value.nodata = -9999
+
+        # Return mock mean values from raster
+        mock_means = [{"mean": 1.0}, {"mean": 0.5}, {"mean": None}] + [{"mean": 1.0}] * (len(dummy_tessellation) - 3)
+        mock_zonal_stats.return_value = mock_means
+
+        start = datetime(2023, 1, 1, 0)
+        end = datetime(2023, 1, 1, 2)
+
+        # Capture original population
+        original_pop = dummy_tessellation["population"].values.copy()
+
+        model.generate_synthetic_trajectory(
+            n_agents=1,
+            start_date=start,
+            end_date=end,
+            tessellation=dummy_tessellation,
+        )
+
+        # Relevances should be population * mean (or 0 if mean is None)
+        expected = original_pop * np.array([1.0, 0.5, 0.0] + [1.0] * (len(original_pop) - 3))
+        np.testing.assert_array_almost_equal(model._relevances, expected)
+
+
+def test_config_raster_path_missing_validation():
+    with pytest.raises(ValidationError) as excinfo:
+        EPRConfig.model_validate({
+            "simulation_with_attractiveness_raster": True,
+            "attractiveness_raster_path": ""
+        })
+
+    assert "`attractiveness_raster_path` must be provided and non-empty" in str(excinfo.value)

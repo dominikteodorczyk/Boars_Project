@@ -5,10 +5,13 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 import powerlaw
+import rasterio
+from rasterstats import zonal_stats
 from tqdm import tqdm
 from geopandas import GeoDataFrame
 from scipy.sparse import lil_matrix
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+from typing import Optional
 
 from model.src.agent import Agent
 from model.src.gravity import Gravity
@@ -44,6 +47,24 @@ class EPRConfig(BaseModel):
         default="population",
         description="Column name in tessellation for spatial relevance (e.g., population, points_count)"
     )
+    simulation_with_attractiveness_raster: bool = Field(
+        default=False,
+        description="Whether to use an attractiveness raster for simulation (if available)"
+    )
+    attractiveness_raster_path: Optional[str] = Field(
+        default=None,
+        description="Path to the attractiveness raster file (if simulation_with_attractiveness_raster is True)"
+    )
+
+    @model_validator(mode="after")
+    def check_attractiveness_raster(self) -> "EPRConfig":
+        if self.simulation_with_attractiveness_raster:
+            if not self.attractiveness_raster_path or self.attractiveness_raster_path.strip() == "":
+                raise ValueError(
+                    "`attractiveness_raster_path` must be provided and non-empty when "
+                    "`simulation_with_attractiveness_raster` is True."
+                )
+        return self
 
 
 class EPR:
@@ -64,6 +85,8 @@ class EPR:
         self._min_waiting_time_hours: float = config.min_waiting_time_minutes / 60.0
 
         # Spatial context
+        self._simulation_with_attractiveness_raster: bool = config.simulation_with_attractiveness_raster
+        self._attractiveness_raster_path: Optional[str] = config.attractiveness_raster_path
         self._tessellation: gpd.GeoDataFrame | None = None
         self._centroids: np.ndarray | None = None
         self._relevances: np.ndarray | None = None
@@ -296,6 +319,12 @@ class Ditras(EPR):
         # Spatial context
         self._tessellation = tessellation
         n_cells = len(self._tessellation)
+
+        if self._attractiveness_raster_path is not None and self._simulation_with_attractiveness_raster:
+            raster = rasterio.open(self._attractiveness_raster_path)
+            stats = zonal_stats(tessellation, self._attractiveness_raster_path, stats=['mean'], nodata=raster.nodata)
+            mean_values = [s['mean'] if s['mean'] is not None else 0 for s in stats]
+            tessellation[self._tessellation_attractiveness_column] *= mean_values
 
         self._relevances = self._tessellation[self._tessellation_attractiveness_column].fillna(0).values
         self._centroids = self._tessellation.geometry.apply(get_geom_centroid, args=[True]).values
