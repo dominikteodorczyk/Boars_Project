@@ -1,0 +1,37 @@
+general:
+  file_path: E:\Projects\ASF\Boars_Project\model\data\input\compressed_gps_5min.csv
+  tessellation_path: E:\Projects\ASF\Boars_Project\model\data\input\tessellation_pop.geojson
+  start_simulation: "2025-01-02 00:00:00"
+  end_simulation: "2025-01-03 00:00:00"
+  output_path: E:\Projects\ASF\Boars_Project\model\data\output
+
+# MARKOV CHAIN PARAMETERS
+markov:
+  name: "MarkovChain"
+  chain_length: 24
+  time_slot: 1h
+  label_column: labels
+
+# EPR PARAMETERS
+#epr:
+#  name: "EPRModel"
+#  rho: 0.6
+#  gamma: 0.21
+
+#  beta: 0.8
+#  tau: 17
+#  min_waiting_time_minutes: 20
+#  tessellation_attractiveness_column: population
+
+#FOR DITRAS
+epr:
+  name: "EPRModel - DITRAS"
+  rho: 0.3
+  gamma: 0.21
+
+  beta: 0.8
+  tau: 17
+  min_waiting_time_minutes: 20
+  tessellation_attractiveness_column: "population"
+  simulation_with_attractiveness_raster: false
+  attractiveness_raster_path: E:\Projects\ASF\Boars_Project\model\data\input\corine_percentage.tif
