@@ -1,0 +1,7 @@
+HuMobi==0.1.17
+pydantic==2.11.7
+powerlaw==1.5
+rasterio==1.4.3
+rasterstats==0.20.0
+python-box==7.3.2
+PyYAML==6.0.2
