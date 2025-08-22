@@ -89,3 +89,51 @@ To do this, use the `infostop_calculations.py` script in which you first specify
 python infostop_calculation.py
 ```
 
+#### Animal Association (Ca coefficient) Calculator
+
+This repository provides a script `annotation.py` for computing the **Ca coefficient** (an association index between animals)
+based on time-series input data. The input must be provided as a CSV file.
+
+The script loads the dataset into a `pandas.DataFrame`, processes it with the `TimeCa` class,
+and saves the results to `animal_ca.csv`.
+Sepcify values of `PATH` to trajectories data and run the script with the command:
+```bash
+python ca_calculations.py
+```
+
+#### Animal Trajectories Annotation
+
+This repository provides tools for **annotating animal trajectory data** with:
+1. **Weather parameters** interpolated from weather stations using **IDW (Inverse Distance Weighting)**.
+2. **Coverage data** sampled from raster maps.
+
+The main script combines both functionalities and outputs two enriched datasets.
+Sepcify values of: `ANIMAL_DATA`, `WEATHER_DATA`, `COVERAGE_DATA` and run the script with the command:
+```bash
+python annotation.py
+```
+
+#### Scaling Laws for Animal Trajectories
+
+This repository provides tools for **processing animal trajectory data** and performing **scaling law calculations**.
+
+The main script automates the following workflow:
+
+1. **Loads trajectory datasets** from the specified input directory.
+2. **Creates an output directory** for storing results and figures.
+3. **Cleans and structures the data** for analysis.
+4. **Applies scaling law calculations** to individual trajectories.
+5. **Collects dataset statistics** and exports them to a CSV file.
+
+Errors during processing of individual files are logged, and the workflow continues with the remaining datasets.
+
+Set the following variables in the script before running:
+
+- `INFOSTOP_DATA_DIR` – directory containing trajectory files
+- `OUTPUT_DIR` – directory for saving results
+
+Run the script with:
+
+```bash
+python scaling_laws.py
+```
