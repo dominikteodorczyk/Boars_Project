@@ -14,12 +14,11 @@ It includes scripts for data parsing, calculations, and analysis related to wild
 
 ## Key Files
 
-- `.gitignore` – Specifies files and directories ignored by Git.
-- `README.md` – This file.
 - `data_parsing.py` – A script for parsing input data.
 - `infostop_calculation.py` – A script for calculating points where animals stop.
 - `laws_params.py` – Calculation of the law of animal mobility.
-- `requirements.txt` – List of required dependencies.
+- `annotation.py` – Animal Trajectories Annotation with environment and coverage data.
+- `ca_calculations.py` – Animal Association (Ca coefficient) Calculator.
 
 ## Getting Started
 ### How to get our solutions
