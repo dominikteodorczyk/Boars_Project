@@ -7,8 +7,8 @@ from shapely.geometry import Point
 
 class GeoProcessor:
     @staticmethod
-    def convert_df_to_gdf(df: pd.DataFrame) -> gpd.GeoDataFrame:
-        gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.lon, df.lat), crs="EPSG:4326")
+    def convert_df_to_gdf(df: pd.DataFrame, crs: str = "EPSG:4326") -> gpd.GeoDataFrame:
+        gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.lon, df.lat), crs=crs)
         gdf.to_crs(3857, inplace=True)
         gdf['lat'] = gdf.geometry.y
         gdf['lon'] = gdf.geometry.x

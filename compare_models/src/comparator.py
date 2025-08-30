@@ -47,7 +47,7 @@ class Comparator:
 
                 resampled_data = self.trajectory_processor.resample_time(filtered_data,
                                                                          self.config_manager.config.input_file_params.resample_freq)
-                resampled_gdf = self.geo_processor.convert_df_to_gdf(resampled_data)
+                resampled_gdf = self.geo_processor.convert_df_to_gdf(resampled_data, "EPSG:3857")
                 resampled_gdf.to_file(os.path.join(output_dir, f'resampled_{file_name}.geojson'), driver='GeoJSON')
 
                 grid_size = self.geo_processor.compute_grid_size(resampled_gdf)
