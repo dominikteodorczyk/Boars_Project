@@ -1,3 +1,7 @@
+"""
+Utility functions for evaluating and comparing movement models. Includes functions to compute flows, plot flows, normalize data, compute Earth Mover's Distance (EMD),
+and plot EMD results.
+"""
 import os
 
 import matplotlib.pyplot as plt
@@ -6,11 +10,23 @@ import pandas as pd
 import scipy.stats
 from pyemd import emd
 from tqdm import tqdm
+import geopandas as gpd
 
 from geo_processor import GeoProcessor
 
 
-def _compute_flows_individual(trajectory, option, without_self_transitions, container):
+def _compute_flows_individual(trajectory: gpd.GeoDataFrame, option: str, without_self_transitions: bool, container: list) -> None:
+    """
+    Compute flows for an individual trajectory based on the specified option. Flows can be computed as 'all', 'incoming', or 'outgoing'.
+
+    Args:
+        trajectory (gpd.GeoDataFrame): The trajectory data for an individual.
+        option (str): The type of flow to compute ('all', 'incoming', 'outgoing').
+        without_self_transitions (bool): If True, self-transitions are ignored in the flow computation.
+        container (list): A list to append the computed flows to.
+    Returns:
+        None: The function appends the computed flows to the provided container list.
+    """
     traj = trajectory.copy()
     if without_self_transitions:
         thresh = 2
@@ -47,7 +63,18 @@ def _compute_flows_individual(trajectory, option, without_self_transitions, cont
     container.append(flows)
 
 
-def compute_flows(trajectory, option, without_self_transitions=True):
+def compute_flows(trajectory: gpd.GeoDataFrame, option: str, without_self_transitions: bool = True) -> pd.Series:
+    """
+    Compute flows for the entire trajectory dataset based on the specified option. Flows can be computed as 'all', 'incoming', or 'outgoing'.
+
+    Args:
+        trajectory (gpd.GeoDataFrame): The trajectory data with a multi-level index where the first level represents individual IDs.
+        option (str): The type of flow to compute ('all', 'incoming', 'outgoing').
+        without_self_transitions (bool):
+            If True, self-transitions are ignored in the flow computation.
+    Returns:
+        pd.Series: A Series containing the computed flows for each tessellation ID.
+    """
     results = []
     trajectory.groupby(level=0).progress_apply(
         lambda x: _compute_flows_individual(x, option, without_self_transitions, results))
@@ -56,7 +83,20 @@ def compute_flows(trajectory, option, without_self_transitions=True):
     return results
 
 
-def plot_flows(flows_org, flows_syn, box_number, plot_path, file_name, option='logscale'):
+def plot_flows(flows_org: pd.Series, flows_syn: pd.Series, box_number: int, plot_path: str, file_name: str, option: str = 'logscale') -> None:
+    """
+    Plot the comparison of original and synthetic flows using scatter and box plots. The plot includes a Pearson correlation coefficient.
+
+    Args:
+        flows_org (pd.Series): Series containing the original flows.
+        flows_syn (pd.Series): Series containing the synthetic flows.
+        box_number (int): Number of boxes to use in the box plot.
+        plot_path (str): Path to save the generated plot.
+        file_name (str): Name of the file to save the plot as (without extension).
+        option (str): Scale option for the x and y axes ('logscale' or 'linescale').
+    Returns:
+        None: The function saves the generated plot to the specified path.
+    """
     flows_org = pd.Series(flows_org, name="flows").to_frame()
     flows_syn = pd.Series(flows_syn, name="flows").to_frame()
 
@@ -127,7 +167,21 @@ def plot_flows(flows_org, flows_syn, box_number, plot_path, file_name, option='l
     plt.savefig(os.path.join(plot_path, file_name + '.png'), dpi=300)
 
 
-def normalize(data, column=None, output_column=None):
+def normalize(data: gpd.GeoDataFrame, column: str = None, output_column: str = None) -> gpd.GeoDataFrame:
+    """
+    Normalize the input data to create a probability distribution. The function can handle both pandas Series and
+    DataFrames. If a DataFrame is provided, the specified column is normalized and the result is stored in a new column.
+    The normalization ensures that the sum of the probabilities equals 1, adjusting for any floating-point precision
+    issues by modifying the maximum value.
+
+    Args:
+        data (pd.Series or pd.DataFrame): The input data to be normalized.
+        column (str, optional): The column name to normalize if the input is a DataFrame. Required if data is a DataFrame.
+        output_column (str, optional): The name of the new column to store the normalized probabilities in the DataFrame.
+                                       Required if data is a DataFrame.
+    Returns:
+        pd.Series or pd.DataFrame: The normalized data with probabilities summing to 1.
+    """
     if isinstance(data, pd.Series):
         probability = data / data.sum()
         offset = 1.0 - probability.sum()
@@ -143,7 +197,19 @@ def normalize(data, column=None, output_column=None):
     return data
 
 
-def compute_emd(org_traj, syn_traj, tessellation):
+def compute_emd(org_traj: gpd.GeoDataFrame, syn_traj: gpd.GeoDataFrame, tessellation: gpd.GeoDataFrame) -> pd.DataFrame:
+    """
+    Compute the Earth Mover's Distance (EMD) between the original and synthetic trajectories for each hour of the day.
+    The function groups the trajectories by hour, normalizes the counts of visits to each tessellation cell, and
+    calculates the EMD using a distance matrix derived from the tessellation.
+
+    Args:
+        org_traj (gpd.GeoDataFrame): The original trajectory data with a multi-level index where the first level represents individual IDs and the second level is 'time'.
+        syn_traj (gpd.GeoDataFrame): The synthetic trajectory data with a similar structure to org_traj.
+        tessellation (gpd.GeoDataFrame): The tessellation grid used for spatial analysis, containing a 'tessellation_id' column.
+    Returns:
+        pd.DataFrame: A DataFrame containing the EMD values for each hour of the day, with columns 'slot' (hour) and 'emd' (EMD value).
+    """
     org_traj = org_traj.copy()
     syn_traj = syn_traj.copy()
 
@@ -195,7 +261,18 @@ def compute_emd(org_traj, syn_traj, tessellation):
     return pd.DataFrame(output, columns=['slot', 'emd'])
 
 
-def plot_emd(data_list, label_list, output_dir, file_name):
+def plot_emd(data_list: list[pd.DataFrame], label_list: list[str], output_dir: str, file_name: str) -> None:
+    """
+    Plot the Earth Mover's Distance (EMD) results for different models over a 24-hour period. Each model's EMD data is plotted with a distinct color.
+
+    Args:
+        data_list (list[pd.DataFrame]): A list of DataFrames containing EMD results for different models. Each DataFrame should have 'slot' and 'emd' columns.
+        label_list (list[str]): A list of labels corresponding to each DataFrame in data_list. Labels should match the keys in the colors dictionary.
+        output_dir (str): The directory where the plot will be saved.
+        file_name (str): The name of the file to save the plot as (without extension).
+    Returns:
+        None: The function saves the generated plot to the specified output directory.
+    """
     colors = {
         "EPR": "blue",
         "RandomWalk": "red",

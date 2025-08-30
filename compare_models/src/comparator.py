@@ -13,7 +13,16 @@ from utils import compute_emd, compute_flows, plot_emd, plot_flows
 
 
 class Comparator:
+    """
+    Class to compare different trajectory simulation models against real trajectory data.
+    """
     def __init__(self, config_file: str):
+        """
+        A class responsible for generating data analysis reports in PDF format.
+
+        Args:
+            config_file (str): Path to the configuration file.
+        """
         self.logger = Logger()
         self.logger.info("Initializing Comparator")
 
@@ -24,7 +33,12 @@ class Comparator:
         self.trajectory_processor = TrajectoryProcessor()
         self.trajectory_simulator = None
 
-    def run(self):
+    def run(self) -> None:
+        """
+        Main method to run the comparison of trajectory simulation models.
+        Processes each input file, simulates trajectories using different models,
+        computes flows and EMD, and generates plots for comparison.
+        """
         for root, _, files in os.walk(self.config_manager.config.paths.input_dir):
             #TODO: Remove splicing limit
             # for file in files[0:1]:

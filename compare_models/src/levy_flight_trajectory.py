@@ -8,7 +8,27 @@ from distfit import distfit
 
 
 class LevyFlightTrajectory:
-    def __init__(self, name, filtered_data_means, tessellation, n_agents, start_time, steps, output_dir_path):
+    """
+    Class to generate synthetic trajectories based on Lévy flight patterns. It computes jump lengths from filtered
+    trajectory data, fits a distribution to these jump lengths, and generates new trajectories for a specified number
+    of agents over a defined time period. The generated trajectories are processed to align with a given tessellation
+    and visualized.
+    """
+
+    def __init__(self, name: str, filtered_data_means: gpd.GeoDataFrame, tessellation: gpd.GeoDataFrame,
+                 n_agents: int | None, start_time: pd.Timestamp | None, steps: int | None,
+                 output_dir_path: str) -> None:
+        """
+        Initialize the LevyFlightTrajectory with necessary parameters.
+        Args:
+            name (str): Name of the trajectory model.
+            filtered_data_means (gpd.GeoDataFrame): Filtered trajectory data with mean points.
+            tessellation (gpd.GeoDataFrame): Geospatial tessellation for spatial referencing.
+            n_agents (int | None): Number of agents to simulate.
+            start_time (pd.Timestamp | None): Start time for the trajectory simulation.
+            steps (int | None): Number of time steps for the simulation.
+            output_dir_path (str): Directory path to save output files and plots.
+        """
         self.name = name
         self.filtered_data_means = filtered_data_means
         self.tessellation = tessellation
@@ -18,7 +38,13 @@ class LevyFlightTrajectory:
         self.output_dir_path = output_dir_path
         self.geo_processor = GeoProcessor()
 
-    def compute_jump_length(self):
+    def compute_jump_length(self) -> distfit:
+        """
+        Compute jump lengths from the filtered trajectory data, fit a distribution to these lengths, and visualize the results.
+
+        Returns:
+            distfit: Fitted distribution model for the jump lengths.
+        """
         jumps = self.geo_processor.jump_lengths(self.filtered_data_means)
         dfit = distfit(
             distr=['norm', 'expon', 'pareto', 'dweibull', 't', 'genextreme', 'gamma', 'lognorm', 'beta', 'uniform',
@@ -41,14 +67,32 @@ class LevyFlightTrajectory:
         plt.savefig(self.output_dir_path + '/levy_flight_jump_length.png')
         return dfit
 
-    def trim_trajectory(self, trajectory):
+    def trim_trajectory(self, trajectory: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """
+        Trim the trajectory to remove any segments after the first occurrence of a NaN tessellation_id for each animal.
+
+        Args:
+            trajectory (gpd.GeoDataFrame): GeoDataFrame containing trajectory data with 'animal_id' and 'tessellation_id' columns.
+        Returns:
+            gpd.GeoDataFrame: Trimmed trajectory GeoDataFrame.
+        """
         trajectory.reset_index(inplace=True)
         if 'time' in trajectory.columns:
             trajectory = trajectory.sort_values(by=['animal_id', 'time'])
         first_nan_idx = trajectory.loc[trajectory['tessellation_id'].isna()].groupby('animal_id').head(1).index
         return trajectory.loc[trajectory.index < first_nan_idx.min()]
 
-    def process_generated_trajectory(self, synt_traj):
+    def process_generated_trajectory(self, synt_traj: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """
+        Process the generated synthetic trajectory by assigning tessellation IDs and updating coordinates to the centroids
+        of the corresponding tessellation cells. The processed trajectory is then converted to a GeoDataFrame with appropriate
+        columns and geometry.
+
+        Args:
+            synt_traj (gpd.GeoDataFrame): Generated synthetic trajectory GeoDataFrame.
+        Returns:
+            gpd.GeoDataFrame: Processed trajectory GeoDataFrame with updated coordinates and tessellation IDs.
+        """
         generated_traj = synt_traj
         generated_traj.set_crs(3857, allow_override=True, inplace=True)
         generated_traj_joined_with_tessellation = gpd.sjoin(generated_traj, self.tessellation, how="left",
@@ -71,7 +115,16 @@ class LevyFlightTrajectory:
                                crs=3857)
         return gdf
 
-    def plot_trajectory(self, trajectory):
+    def plot_trajectory(self, trajectory: pd.DataFrame) -> None:
+        """
+        Plot the trajectory of all animals on a 2D plane, with different colors for each animal. The plot includes
+        axis labels, a legend, and is saved to the specified output directory.
+
+        Args:
+            trajectory (pd.DataFrame): DataFrame containing trajectory data with 'animal_id', 'lon', and 'lat' columns.
+        Returns:
+            None
+        """
         trajectory = trajectory.reset_index()
         minx, miny, maxx, maxy = self.tessellation.total_bounds
         plt.figure(figsize=(8, 8))
@@ -91,7 +144,15 @@ class LevyFlightTrajectory:
         plt.tight_layout()
         plt.savefig(self.output_dir_path + '/levy_flight_trajectory.png')
 
-    def generate_trajectory(self):
+    def generate_trajectory(self) -> pd.DataFrame:
+        """
+        Generate synthetic trajectories for a specified number of agents over a defined time period using Lévy flight patterns.
+        The generated trajectories are processed to align with a given tessellation and visualized.
+
+        Returns:
+            pd.DataFrame: DataFrame containing the generated synthetic trajectories with columns for animal ID, time,
+            latitude, longitude, tessellation ID, and geometry.
+        """
         model = self.compute_jump_length()
         minx, miny, maxx, maxy = self.tessellation.total_bounds
 
