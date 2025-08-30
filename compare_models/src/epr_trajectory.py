@@ -103,7 +103,7 @@ class EPRTrajectory:
                 group_resampled = group.resample('1h').apply(self.longest_visited_row)
             group_resampled = group_resampled.resample('1h').first()
             # Fill missing data using forward-fill and backward-fill
-            group_resampled = group_resampled.ffill().bfill()
+            group_resampled = group_resampled.drop(columns="geometry").ffill().bfill()
 
             # Store processed data for concatenation
             to_concat[uid] = group_resampled
