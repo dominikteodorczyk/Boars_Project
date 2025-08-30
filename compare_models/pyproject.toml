@@ -1,0 +1,35 @@
+[project]
+name = "compare-models"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+readme = "README.md"
+
+requires-python = ">=3.10,<3.12"
+dependencies = [
+    "humobi (>=0.1.17,<0.2.0)",
+    "pyyaml (==6.0.2)",
+    "python-box (==7.3.2)",
+    "matplotlib (==3.7.1)",
+    "distfit (>=1.8.8,<2.0.0)",
+    "scikit-mobility (>=1.3.1,<2.0.0)",
+    "pandas (==1.4.2)",
+    "numpy (>=1.23,<1.26)",
+    "tensorflow-io-gcs-filesystem (==0.31.0)",
+    "shapely (>=2.0.1,<2.1)",
+    "pyemd (>=1.0.0,<2.0.0)",
+    "geopandas (>=0.10.2,<0.11.0)",
+    "rtree (>=1.4.1,<2.0.0)",
+    "pdoc (>=15.0.4,<16.0.0)",
+
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = false
