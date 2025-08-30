@@ -27,6 +27,7 @@ The project is organized in a modular way to separate the logic of data processi
 ## How to get started
 
 This branch uses Poetry to manage dependencies and the environment.
+
 1. **Installing Poetry:**
 
     If you do not have Poetry installed, follow the official documentation:
