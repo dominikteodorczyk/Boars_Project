@@ -15,7 +15,7 @@ EPR (Exploration and Preferential Return) model, and other statistical methods.
 - `utils` - Utility functions
 
 
-## Configuration (`config.yaml`)
+## Configuration 
 
 The `config.yaml` file is divided into several sections that control different aspects of the simulation.
 
