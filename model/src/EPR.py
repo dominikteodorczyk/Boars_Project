@@ -13,10 +13,10 @@ from scipy.sparse import lil_matrix
 from pydantic import BaseModel, Field, model_validator
 from typing import Optional
 
-from model.src.agent import Agent
-from model.src.gravity import Gravity
-from model.src.markov_chain import MarkovChain
-from model.utils.utils import euclidean_distance, get_geom_centroid
+from src.agent import Agent
+from src.gravity import Gravity
+from src.markov_chain import MarkovChain
+from utils.utils import euclidean_distance, get_geom_centroid
 
 
 def compute_od_row(origin: int, centroids: np.ndarray, relevances: np.ndarray,

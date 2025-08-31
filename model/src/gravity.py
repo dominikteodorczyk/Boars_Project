@@ -1,6 +1,6 @@
 import numpy as np
 import geopandas as gpd
-from ..utils import utils
+from utils import utils
 from typing import Callable, Sequence
 from tqdm import tqdm
 
