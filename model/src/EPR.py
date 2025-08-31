@@ -13,9 +13,9 @@ from scipy.sparse import lil_matrix
 from pydantic import BaseModel, Field, model_validator
 from typing import Optional
 
-from src.agent import Agent
-from src.gravity import Gravity
-from src.markov_chain import MarkovChain
+from .agent import Agent
+from .gravity import Gravity
+from .markov_chain import MarkovChain
 from utils.utils import euclidean_distance, get_geom_centroid
 
 
