@@ -1,9 +1,9 @@
 general:
   file_path: E:\Projects\ASF\Boars_Project\model\data\input\compressed_gps_5min.csv
   tessellation_path: E:\Projects\ASF\Boars_Project\model\data\input\tessellation_pop.geojson
+  output_path: E:\Projects\ASF\Boars_Project\model\data\output
   start_simulation: "2025-01-02 00:00:00"
   end_simulation: "2025-01-03 00:00:00"
-  output_path: E:\Projects\ASF\Boars_Project\model\data\output
 
 # MARKOV CHAIN PARAMETERS
 markov:
