@@ -21,6 +21,18 @@ from model.utils.utils import euclidean_distance, get_geom_centroid
 
 def compute_od_row(origin: int, centroids: np.ndarray, relevances: np.ndarray,
                    gravity_model: Gravity) -> np.ndarray:
+    """
+    Compute a single row of the OD matrix for a given origin using the gravity model.
+    The result is a probability distribution over all possible destinations.
+
+    Args:
+        origin (int): Index of the origin cell.
+        centroids (np.ndarray): Array of shape (n_cells,) with list of (lat, lon) centroids.
+        relevances (np.ndarray): Array of shape (n_cells,) with cell relevances (e.g., population).
+        gravity_model (Gravity): An instance of the Gravity model to compute scores.
+    Returns:
+        np.ndarray: Probability distribution over destinations from the origin.
+    """
     origin_ll = centroids[origin]
     distances = np.array([euclidean_distance(origin_ll, dest_ll) for dest_ll in centroids])
 
@@ -37,6 +49,21 @@ def compute_od_row(origin: int, centroids: np.ndarray, relevances: np.ndarray,
 
 
 class EPRConfig(BaseModel):
+    """
+    Configuration for the Exploration & Preferential Return (EPR) mobility model.
+    Validates parameters and provides default values.
+
+    Attributes:
+        name (str): Name of the EPR model.
+        rho (float): Base exploration probability (0 <= rho <= 1).
+        gamma (float): Exploration decay rate (gamma >= 0).
+        beta (float): Waiting‑time exponent (beta >= 0).
+        tau (int): Waiting‑time truncation in hours (tau >= 1).
+        min_waiting_time_minutes (int): Minimum waiting time in minutes (min_waiting_time_minutes >= 0).
+        tessellation_attractiveness_column (str): Column name in tessellation for spatial relevance.
+        simulation_with_attractiveness_raster (bool): Whether to use an attractiveness raster for simulation.
+        attractiveness_raster_path (Optional[str]): Path to the attractiveness raster file.
+    """
     name: str = Field(default="EPR Model", description="Name of the EPR model")
     rho: float = Field(default=0.6, ge=0.0, le=1.0, description="Base exploration probability")
     gamma: float = Field(default=0.21, ge=0.0, description="Exploration decay rate")
@@ -58,6 +85,15 @@ class EPRConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_attractiveness_raster(self) -> "EPRConfig":
+        """
+        Validate that if `simulation_with_attractiveness_raster` is True,
+        then `attractiveness_raster_path` must be provided and non-empty.
+
+        Raises:
+            ValueError: If the conditions are not met.
+        Returns:
+            EPRConfig: The validated configuration instance.
+        """
         if self.simulation_with_attractiveness_raster:
             if not self.attractiveness_raster_path or self.attractiveness_raster_path.strip() == "":
                 raise ValueError(
@@ -75,6 +111,12 @@ class EPR:
     """
 
     def __init__(self, config: EPRConfig) -> None:
+        """
+        Initialize the EPR model with the given configuration.
+
+        Args:
+            config (EPRConfig): Configuration parameters for the EPR model.
+        """
         self.name = config.name
 
         # Hyper-parameters
@@ -107,34 +149,85 @@ class EPR:
 
     @property
     def rho(self) -> float:
+        """
+        Base exploration probability.
+
+        Getter:
+            **Returns:**
+                float: The base exploration probability (0 <= rho <= 1).
+        """
         return self._rho
 
     @property
     def gamma(self) -> float:
+        """
+        Exploration decay rate.
+
+        Getter:
+            **Returns:**
+                float: The exploration decay rate (gamma >= 0).
+        """
         return self._gamma
 
     @property
     def beta(self) -> float:
+        """
+        Waiting‑time exponent.
+
+        Getter:
+            **Returns:**
+                float: The waiting‑time exponent (beta >= 0).
+        """
         return self._beta
 
     @property
     def tau(self) -> int:
+        """
+        Waiting‑time truncation in hours.
+
+        Getter:
+            **Returns:**
+                int: The waiting‑time truncation in hours (tau >= 1).
+        """
         return self._tau
 
     @property
     def min_waiting_time_hours(self) -> float:
+        """
+        Minimum waiting time in hours.
+
+        Getter:
+            **Returns:**
+                float: The minimum waiting time in hours (min_waiting_time_hours >= 0).
+        """
         return self._min_waiting_time_hours
 
     @property
     def trajectories(self) -> list[list]:
+        """
+        The raw trajectory list. Each entry is a list of: [iter, agent_id, timestamp, location].
+
+        Getter:
+            **Returns:**
+                list[list]: The raw trajectory data.
+        """
         return self._trajectories
 
     @property
     def trajectories_df(self) -> pd.DataFrame | None:
+        """
+        The trajectory data as a pandas DataFrame with columns: iter, agent_id, timestamp, location.
+
+        Getter:
+            **Returns:**
+                pd.DataFrame | None: The trajectory DataFrame, or None if not yet converted.
+        """
         return self._trajectories_df
 
     def convert_trajectories_to_dataframe(self) -> None:
-        """Convert the trajectory list to a pandas DataFrame."""
+        """
+        Convert the trajectory list to a pandas DataFrame. Stores the result in `self._trajectories_df`.
+        """
         df = pd.DataFrame(
             self._trajectories,
             columns=["iter", "agent_id", "timestamp", "location"]
@@ -142,6 +235,15 @@ class EPR:
         self._trajectories_df = df
 
     def convert_trajectories_to_geodataframe(self) -> gpd.GeoDataFrame:
+        """
+        Convert the trajectory DataFrame to a GeoDataFrame with point geometries at cell centroids.
+        Requires that the tessellation is set and that the trajectories DataFrame is available.
+
+        Returns:
+            gpd.GeoDataFrame: The trajectory data as a GeoDataFrame with columns: agent_id, timestamp, lat, lon, geometry.
+        Raises:
+            ValueError: If the tessellation is not set or if the trajectories DataFrame is not available.
+        """
         if self._tessellation is None:
             raise ValueError("Tessellation is not set. Cannot convert trajectories to GeoDataFrame.")
         if self._tessellation.crs.is_geographic:
@@ -156,8 +258,19 @@ class EPR:
 
         return gdf[["agent_id", "timestamp", "lat", "lon", "geometry"]]
 
-    def expand_trajectory_to_hourly_steps(self, start_date: datetime, end_date: datetime):
-        """Expand the trajectory to hourly steps between start_date and end_date."""
+    def expand_trajectory_to_hourly_steps(self, start_date: datetime, end_date: datetime) -> None:
+        """
+        Expand the trajectory to hourly steps between start_date and end_date.
+        Fills in missing hours by forward-filling the last known location.
+
+        Args:
+            start_date (datetime): The start date of the simulation period.
+            end_date (datetime): The end date of the simulation period.
+        Raises:
+            ValueError: If the trajectories DataFrame is not available.
+        Returns:
+            None: The method updates `self._trajectories_df` in place.
+        """
         if self._trajectories_df is None:
             raise ValueError("Trajectories DataFrame is not available. Cannot expand to hourly steps.")
         df = self._trajectories_df.sort_values(["agent_id", "timestamp"])
@@ -184,18 +297,35 @@ class EPR:
         )
 
     def _sample_wait_hours(self) -> float:
-        """Draw a single waiting time (in hours) from a truncated power law."""
+        """
+        Draw a single waiting time (in hours) from a truncated power law.
+
+        Returns:
+            float: A sampled waiting time in hours.
+        """
         dist = powerlaw.Truncated_Power_Law(
             xmin=self._min_waiting_time_hours, parameters=[1.0 + self._beta, 1.0 / self._tau]
         )
         return float(dist.generate_random()[0])
 
     def _sample_wait_delta(self) -> timedelta:
-        """Return waiting time as ``datetime.timedelta``."""
+        """
+        Return waiting time as ``datetime.timedelta``. Uses `_sample_wait_hours()` internally.
+
+        Returns:
+            timedelta: A sampled waiting time as a timedelta object.
+        """
         return timedelta(hours=self._sample_wait_hours())
 
     def _pick_preferential_location(self, current_loc: int) -> int:
-        """Select a *visited* cell according to visitation frequencies."""
+        """
+        Select a *visited* cell according to visitation frequencies. Excludes the current location.
+
+        Args:
+            current_loc (int): The agent's current location index.
+        Returns:
+            int: The selected location index.
+        """
         visited = self._agent.visited_locations
         locs, counts = zip(*((loc, cnt) for loc, cnt in visited.items() if loc != current_loc))
         probs = np.asarray(counts, dtype=float)
@@ -203,7 +333,16 @@ class EPR:
         return int(np.random.choice(locs, p=probs))
 
     def _explore_new_location(self, current_loc: int) -> int:
-        """Pick a *new* location using (cached) OD probabilities."""
+        """
+        Pick a *new* location using (cached) OD probabilities. If the OD row for the current location is not yet
+        computed, it will be calculated on‑demand. Excludes the current location from possible destinations. If no other
+        locations are available (e.g., only one cell in tessellation), returns the current location.
+
+        Args:
+            current_loc (int): The agent's current location index.
+        Returns:
+            int: The selected new location index. If no new location is available, returns `current_loc`.
+        """
         # Retrieve or lazily compute probability vector for this origin.
         od_row = self._od.getrowview(current_loc)
         if od_row.nnz == 0:
@@ -217,7 +356,15 @@ class EPR:
         return int(np.random.choice(destinations, p=probs))
 
     def _choose_next_location(self) -> int:
-        """Decide whether to *explore* or *return*, then pick the destination."""
+        """
+        Decide whether to *explore* or *return*, then pick the destination. The exploration probability decays with
+        the number of unique visited locations. If exploring, a new location is chosen using the OD matrix;
+        if returning, a previously visited location is selected based on visitation frequency. If no new locations
+        are available, the agent will return to a visited location.
+
+        Returns:
+            int: The selected next location index.
+        """
         num_visited = len(self._agent.visited_locations)
         # First step: explore from the starting cell
         if num_visited == 0:
@@ -239,7 +386,25 @@ class EPR:
                                       tessellation: gpd.GeoDataFrame, gravity_model: Gravity | None = None,
                                       starting_cells: list[int] | None = None, od_matrix: lil_matrix | None = None,
                                       random_state: int | None = None) -> GeoDataFrame:
-        """Simulate trajectories for *n_agents* between *start_date* and *end_date*."""
+        """
+        Simulate trajectories for *n_agents* between *start_date* and *end_date*. Each agent starts from a specified or
+        random cell in the tessellation. The OD matrix is computed on‑demand using the provided or default gravity
+        model. The resulting trajectories are returned as a GeoDataFrame with point geometries at cell centroids.
+
+        Args:
+            n_agents (int): Number of agents to simulate.
+            start_date (datetime): Start date of the simulation period.
+            end_date (datetime): End date of the simulation period.
+            tessellation (gpd.GeoDataFrame): Spatial tessellation with a geometry column and an attractiveness column.
+            gravity_model (Gravity | None): An optional Gravity model instance. If None, a default singly-constrained model is used.
+            starting_cells (list[int] | None): Optional list of starting cell indices for agents. If provided, must have at least `n_agents` elements. If None, starting cells are chosen randomly.
+            od_matrix (lil_matrix | None): Optional precomputed OD matrix. If None, it will be computed on‑demand.
+            random_state (int | None): Optional random seed for reproducibility.
+        Returns:
+            gpd.GeoDataFrame: The simulated trajectories with columns: agent_id, timestamp, lat, lon, geometry.
+        Raises:
+            ValueError: If `starting_cells` is provided but has fewer than `n_agents` elements.
+        """
         if starting_cells is not None and len(starting_cells) < n_agents:
             raise ValueError("'starting_cells' must contain at least 'n_agents' elements.")
 
@@ -278,7 +443,19 @@ class EPR:
         return self.convert_trajectories_to_geodataframe()
 
     def _simulate_agent_trajectory(self, agent: Agent, start_date: datetime, end_date: datetime) -> None:
-        """Run the event‑based simulation loop for a single agent."""
+        """
+        Run the event‑based simulation loop for a single agent. The agent starts at the specified starting cell and
+        iteratively decides to explore new locations or return to previously visited ones, based on the EPR model's
+        probabilities. The agent waits at each location for a time drawn from a truncated power law distribution before
+        moving again. The trajectory is recorded in `self._trajectories`.
+
+        Args:
+            agent (Agent): The agent to simulate.
+            start_date (datetime): The start date of the simulation period.
+            end_date (datetime): The end date of the simulation period.
+        Returns:
+            None: The method updates `self._trajectories` in place.
+        """
         current_time = start_date
         iter_idx = 0
 
@@ -297,11 +474,27 @@ class EPR:
             agent.visited_locations[next_loc] += 1
             self._trajectories.append([iter_idx, agent.id, current_time, next_loc])
 
+    pick_preferential_location = _pick_preferential_location  # Expose for docs
+    explore_new_location = _explore_new_location  # Expose for docs
+    choose_next_location = _choose_next_location  # Expose for docs
+    simulate_agent_trajectory = _simulate_agent_trajectory  # Expose for docs
+
+
 
 class Ditras(EPR):
-    """Ditras model, inheriting from EPR."""
+    """
+    Ditras model, inheriting from EPR. Uses a Markov chain for diary generation. Overrides the trajectory generation method to
+    incorporate diary-based location choices. Requires a MarkovChain instance for diary generation.
+    """
 
     def __init__(self, config: EPRConfig, diary_generator: MarkovChain) -> None:
+        """
+        Initialize the Ditras model with the given configuration and diary generator. Inherits from EPR.
+
+        Args:
+            config (EPRConfig): Configuration parameters for the EPR model.
+            diary_generator (MarkovChain): An instance of MarkovChain for generating activity diaries.
+        """
         super().__init__(config)
         self._diary_generator = diary_generator
 
@@ -309,7 +502,25 @@ class Ditras(EPR):
                                       tessellation: gpd.GeoDataFrame, gravity_model: Gravity | None = None,
                                       starting_cells: list[int] | None = None, od_matrix: lil_matrix | None = None,
                                       random_state: int | None = None) -> GeoDataFrame:
-        """Simulate trajectories for *n_agents* between *start_date* and *end_date*."""
+        """
+        Simulate trajectories for *n_agents* between *start_date* and *end_date*. Each agent starts from a specified or
+        random cell in the tessellation. The OD matrix is computed on‑demand using the provided or default gravity
+        model. The resulting trajectories are returned as a GeoDataFrame with point geometries at cell centroids.
+
+        Args:
+            n_agents (int): Number of agents to simulate.
+            start_date (datetime): Start date of the simulation period.
+            end_date (datetime): End date of the simulation period.
+            tessellation (gpd.GeoDataFrame): Spatial tessellation with a geometry column and an attractiveness column.
+            gravity_model (Gravity | None): An optional Gravity model instance. If None, a default singly-constrained model is used.
+            starting_cells (list[int] | None): Optional list of starting cell indices for agents. If provided, must have at least `n_agents` elements. If None, starting cells are chosen randomly.
+            od_matrix (lil_matrix | None): Optional precomputed OD matrix. If None, it will be computed on‑demand.
+            random_state (int | None): Optional random seed for reproducibility.
+        Returns:
+            gpd.GeoDataFrame: The simulated trajectories with columns: agent_id, timestamp, lat, lon, geometry.
+        Raises:
+            ValueError: If `starting_cells` is provided but has fewer than `n_agents` elements.
+        """
         if starting_cells is not None and len(starting_cells) < n_agents:
             raise ValueError("'starting_cells' must contain at least 'n_agents' elements.")
 
@@ -354,7 +565,17 @@ class Ditras(EPR):
         return self.convert_trajectories_to_geodataframe()
 
     def _simulate_agent_trajectory(self, agent: Agent, start_date: datetime, end_date: datetime) -> None:
-        """Run the event‑based simulation loop for a single agent."""
+        """
+        Run the event‑based simulation loop for a single agent.
+        The agent starts at the specified starting cell and follows an activity diary generated by a Markov chain.
+        The trajectory is recorded in `self._trajectories`.
+        Args:
+            agent (Agent): The agent to simulate.
+            start_date (datetime): The start date of the simulation period.
+            end_date (datetime): The end date of the simulation period.
+        Returns:
+            None: The method updates `self._trajectories` in place.
+        """
 
         n_hours = int((end_date - start_date).total_seconds() // 3600)
         iter_idx = 0
@@ -371,3 +592,5 @@ class Ditras(EPR):
 
             agent.visited_locations[next_loc] += 1
             self._trajectories.append([iter_idx, agent.id, row.datetime, next_loc])
+
+    simulate_agent_trajectory = _simulate_agent_trajectory  # Expose for docs
