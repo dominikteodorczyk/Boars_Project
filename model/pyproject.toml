@@ -16,7 +16,8 @@ dependencies = [
     "pyyaml (==6.0.2)",
     "tensorflow-io-gcs-filesystem (==0.31.0)",
     "humobi (==0.1.17)",
-    "pdoc (>=15.0.4,<16.0.0)"
+    "pdoc (>=15.0.4,<16.0.0)",
+    "coverage (>=7.10.6,<8.0.0)"
 ]
 
 
