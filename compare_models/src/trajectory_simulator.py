@@ -5,6 +5,7 @@ from humobi.tools.user_statistics import user_trajectories_duration
 
 from config_manager import ConfigManager
 from epr_trajectory import EPRTrajectory
+from sts_epr_trajecotry import STS_EPRTrajectory
 from logger import Logger
 from random_walk_trajectory import RandomWalkTrajectory
 from levy_flight_trajectory import LevyFlightTrajectory
@@ -61,6 +62,7 @@ class TrajectorySimulator:
         self.epr_trajectory = EPRTrajectory(config_manager, filtered_data_means, resampled_gdf, tessellation, starting_positions, self.start_time, self.end_time, self.n_agents, self.output_dir_path)
         self.random_walk_trajectory = RandomWalkTrajectory(config_manager, grid_size, tessellation, self.n_agents, self.start_time, self.steps, self.output_dir_path)
         self.levy_flight_trajectory = LevyFlightTrajectory("LevyFlight", filtered_data_means, tessellation, self.n_agents, self.start_time, self.steps, self.output_dir_path)
+        self.sts_epr_trajectory = STS_EPRTrajectory(config_manager, resampled_gdf, tessellation, self.start_time, self.end_time, self.n_agents, self.output_dir_path)
 
     def get_users_list(self, df: pd.DataFrame) -> list:
         """
@@ -107,11 +109,11 @@ class TrajectorySimulator:
 
     def simulate(self, model_name: str) -> gpd.GeoDataFrame:
         """
-        Run the simulation for the specified model (EPR, Random Walk, Levy Flight) and save the generated trajectory to a file. The generated trajectory is returned as a GeoDataFrame.
-        When saving the trajectory to a file, the filename is prefixed with the model name (e.g., 'epr_generated_', 'rw_generated_', 'lf_generated_') followed by the original file name and a '.geojson' extension.
+        Run the simulation for the specified model (EPR, STS-EPR, Random Walk, Levy Flight) and save the generated trajectory to a file. The generated trajectory is returned as a GeoDataFrame.
+        When saving the trajectory to a file, the filename is prefixed with the model name (e.g., 'epr_generated_', 'sts_epr_generated_', 'rw_generated_', 'lf_generated_') followed by the original file name and a '.geojson' extension.
 
         Args:
-            model_name (str): Name of the trajectory model to simulate ('EPR', 'RandomWalk', 'LevyFlight').
+            model_name (str): Name of the trajectory model to simulate ('EPR', 'STS-EPR', 'RandomWalk', 'LevyFlight').
         Returns:
             gpd.GeoDataFrame: GeoDataFrame containing the generated trajectory with geometry column.
         """
@@ -129,4 +131,8 @@ class TrajectorySimulator:
             trajectory = self.levy_flight_trajectory.generate_trajectory()
             trajectory.set_index(['animal_id', 'time'], inplace=True)
             trajectory.to_file(os.path.join(self.output_dir_path, 'lf_generated_' + self.file_name + '.geojson'), driver='GeoJSON')
+            return trajectory
+        elif model_name == "STS_EPR":
+            trajectory = self.sts_epr_trajectory.generate_trajectory()
+            trajectory.to_file(os.path.join(self.output_dir_path, 'sts_epr_generated_' + self.file_name + '.geojson'), driver='GeoJSON')
             return trajectory

@@ -275,6 +275,7 @@ def plot_emd(data_list: list[pd.DataFrame], label_list: list[str], output_dir: s
     """
     colors = {
         "EPR": "blue",
+        "STS_EPR": "orange",
         "RandomWalk": "red",
         "LevyFlight": "green"
     }

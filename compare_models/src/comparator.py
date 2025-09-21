@@ -83,23 +83,27 @@ class Comparator:
                                                                 self.config_manager)
 
                 epr_traj = self.trajectory_simulator.simulate("EPR")
+                sts_epr_traj = self.trajectory_simulator.simulate("STS_EPR")
                 rw_traj = self.trajectory_simulator.simulate("RandomWalk")
                 lf_traj = self.trajectory_simulator.simulate("LevyFlight")
 
                 flows_org = compute_flows(trajectory_with_grid_id, 'all')
                 flows_epr = compute_flows(epr_traj, 'all')
+                flows_sts_epr = compute_flows(sts_epr_traj, 'all')
                 flows_rw = compute_flows(rw_traj, 'all')
                 flows_lf = compute_flows(lf_traj, 'all')
 
                 plot_flows(flows_org, flows_epr, 25, output_dir, "epr_flows", 'logscale')
+                plot_flows(flows_org, flows_sts_epr, 25, output_dir, "sts_epr_flows", 'logscale')
                 plot_flows(flows_org, flows_rw, 25, output_dir, "rw_flows", 'logscale')
                 plot_flows(flows_org, flows_lf, 25, output_dir, "lf_flows", 'logscale')
 
                 emd_epr = compute_emd(trajectory_with_grid_id, epr_traj, raw_tessellation)
+                emd_sts_epr = compute_emd(trajectory_with_grid_id, sts_epr_traj, raw_tessellation)
                 emd_rw = compute_emd(trajectory_with_grid_id, rw_traj, raw_tessellation)
                 emd_lf = compute_emd(trajectory_with_grid_id, lf_traj, raw_tessellation)
 
-                plot_emd([emd_epr, emd_rw, emd_lf], ["EPR", "RandomWalk", "LevyFlight"], output_dir, "emd_rw_lf")
+                plot_emd([emd_epr, emd_sts_epr, emd_rw, emd_lf], ["EPR", "STS_EPR", "RandomWalk", "LevyFlight"], output_dir, "emd")
 
 
 if __name__ == "__main__":
