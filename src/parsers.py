@@ -5,10 +5,14 @@ import logging
 from typing import Optional
 from pandas.errors import ParserError
 
+#TODO: implement object oriented appr.
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
     )
+
+
 
 def test_data_detector(id: str) -> bool:
     """

@@ -376,7 +376,6 @@ class TimeCa(CoeffAssociation):
         pairs = list(combinations(users, 2))
         data = self.data.copy(deep=True)
 
-        # Zbuduj argumenty jako krotki (data, pair)
         args_list = [(data, pair) for pair in pairs]
 
         results = []
@@ -389,17 +388,62 @@ class TimeCa(CoeffAssociation):
         results_frame = results_frame.sort_values("Ca", ascending=False).reset_index(drop=True)
         return results_frame
 
-def meeting_worker(args):
+import numpy as np
+import pandas as pd
+from typing import Tuple, Any
+from geopy.distance import geodesic
+
+
+def meeting_worker(args: Tuple[pd.DataFrame, Tuple[Any, Any]]) -> Tuple[Any, Any, float]:
+    """
+    Worker function to calculate the meeting coefficient between two agents.
+
+    Args:
+        args (Tuple[pd.DataFrame, Tuple[Any, Any]]):
+            - data: DataFrame containing GPS points with columns ["user_id", "datetime", "lat", "lon"].
+            - pair: Tuple of two agent identifiers (main_agent, second_agent).
+
+    Returns:
+        Tuple[Any, Any, float]: (main_agent, second_agent, meeting_coefficient).
+            Returns 0.0 for the coefficient if an error occurs.
+    """
     data, pair = args
     a, b = pair
     try:
         ca = calc_meeting_wrapper(data, a, b)
-        return (a, b, ca)
-    except Exception as e:
-        return (a, b, 0)  # Możesz dać NaN
+        return a, b, ca
+    except Exception:
+        return a, b, 0.0
 
 
-def calc_meeting_wrapper(data, main_agent, second_agent):
+def calc_meeting_wrapper(
+    data: pd.DataFrame,
+    main_agent: Any,
+    second_agent: Any
+) -> float:
+    """
+    Calculate a meeting coefficient between two agents based on spatiotemporal overlap.
+
+    For each overlapping time period between the agents, the function computes
+    the geodesic distance between them and weights it by the overlap duration.
+    The coefficient approaches 1 when agents are consistently close during overlaps.
+
+    Args:
+        data (pd.DataFrame): DataFrame with GPS points.
+            Must include columns:
+            - "user_id": agent identifier
+            - "datetime": timestamp (pd.Timestamp)
+            - "lat": latitude
+            - "lon": longitude
+        main_agent (Any): Identifier of the first agent.
+        second_agent (Any): Identifier of the second agent.
+
+    Returns:
+        float: Meeting coefficient in range [0, 1].
+            - 0.0 → no overlap or no proximity
+            - 1.0 → agents always at minimal distance during overlaps
+    """
+    # Filter and sort data
     m_agent_data = data[data["user_id"] == main_agent].sort_values("datetime").copy()
     m_agent_data["start"] = m_agent_data["datetime"]
     m_agent_data["end"] = m_agent_data["datetime"].shift(-1)
@@ -408,20 +452,21 @@ def calc_meeting_wrapper(data, main_agent, second_agent):
     s_agent_data["start"] = s_agent_data["datetime"]
     s_agent_data["end"] = s_agent_data["datetime"].shift(-1)
 
-    # Usuń zerowe przedziały
+    # Remove invalid intervals
     m_agent_data = m_agent_data[m_agent_data["start"] < m_agent_data["end"]]
     s_agent_data = s_agent_data[s_agent_data["start"] < s_agent_data["end"]]
 
-    distances = []
-    time_together = []
+    distances: list[float] = []
+    time_together: list[float] = []
 
+    # Check for overlapping intervals
     for _, row in m_agent_data.iterrows():
-        df_time_sort = s_agent_data[
-            (s_agent_data["start"] < row["end"])
-            & (s_agent_data["end"] > row["start"])
+        overlaps = s_agent_data[
+            (s_agent_data["start"] < row["end"]) &
+            (s_agent_data["end"] > row["start"])
         ]
 
-        for _, row_sort in df_time_sort.iterrows():
+        for _, row_sort in overlaps.iterrows():
             distance = geodesic(
                 (row_sort["lat"], row_sort["lon"]),
                 (row["lat"], row["lon"])
@@ -435,12 +480,11 @@ def calc_meeting_wrapper(data, main_agent, second_agent):
                 distances.append(distance)
                 time_together.append(period)
 
-    ca = 0.0
+    # Calculate coefficient
     if distances and time_together:
         dmax = max(distances)
         tsum = np.sum(time_together)
-        for i in range(len(time_together)):
-            ca += distances[i]/dmax * (time_together[i]/tsum)
+        ca = sum(distances[i] / dmax * (time_together[i] / tsum) for i in range(len(time_together)))
         return 1 - ca
-    else:
-        return 0.0
+
+    return 0.0
