@@ -1,12 +1,10 @@
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
-from geopandas import GeoDataFrame
-from typing import Union
-import geopandas as gpd
-import pandas as pd
+from shapely.geometry import Point, LineString
 from shapely.ops import unary_union
 from geopandas import GeoDataFrame
+from typing import Optional, Union
 
 
 def calculate_roads_intersections(
