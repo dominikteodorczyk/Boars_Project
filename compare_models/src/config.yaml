@@ -1,0 +1,12 @@
+epr_params:
+  relevance_column: points_count
+
+paths:
+  input_dir: ../../data/Trajectory_processed_all
+  output_dir: ../../data/output
+
+input_file_params:
+  quartile: 0.25
+  resample_freq: 1h
+
+
