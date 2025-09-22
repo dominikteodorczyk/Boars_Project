@@ -924,7 +924,7 @@ class DataSetStats:
                 pairs of statistics to be added.
         """
 
-        self.record.update(data)
+        self.record.update((data))
 
 
     def add_record(self) -> None:
@@ -987,6 +987,8 @@ class Prepocessing:
                     label_df[["user_id", "labels", "datetime", "lat", "lon"]],
                     ignore_index=True,
                 )  # type: ignore
+
+                # geometry_df = pd.concat([geometry_df, label_df], ignore_index=True)
 
         return TrajectoriesFrame(
             geometry_df.sort_values("datetime").drop_duplicates()
@@ -3643,11 +3645,11 @@ class ScalingLawsCalc:
         self.pdf.add_page()
         laws.waiting_times(filtered_animals)
         laws.jump_lengths_distribution(filtered_animals)
-        # laws.travel_times(filtered_animals)
-        # laws.rog(filtered_animals)
+        laws.travel_times(filtered_animals)
+        laws.rog(filtered_animals)
         laws.msd_distribution(filtered_animals)
-        # laws.return_time_distribution(filtered_animals)
-        # laws.exploration_time(filtered_animals)
+        laws.return_time_distribution(filtered_animals)
+        laws.exploration_time(filtered_animals)
         laws.estimate_pnew(filled_data)
 
         pdf_path = os.path.join(
