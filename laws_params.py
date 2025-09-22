@@ -49,17 +49,14 @@ def main():
     In case of errors, logs them and continues processing the next files.
     """
     try:
-        # Retrieve file paths from the data directory
         file_paths = get_file_paths(INFOSTOP_DATA_DIR)
 
-        # Create output directory for results
         output_dir = create_output_directory(
             base_path=os.path.dirname(__file__), dir_name=OUTPUT_DIR
         )
 
         dataset_stats = DataSetStats(output_dir)
 
-        # Process each file
         for parsed_file in file_paths:
             try:
                 logging.info(f"Processing file: {parsed_file}")
