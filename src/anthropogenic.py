@@ -1,10 +1,13 @@
 import pandas as pd
 import geopandas as gpd
+import numpy as np
 import matplotlib.pyplot as plt
 from shapely.geometry import Point, LineString
 from shapely.ops import unary_union
 from geopandas import GeoDataFrame
 from typing import Optional, Union
+import seaborn as sns
+from scipy.stats import pearsonr
 
 
 def calculate_roads_intersections(
@@ -418,3 +421,70 @@ def plot_animals_roads(
     plt.legend()
     plt.title(title)
     plt.show()
+
+def haversine(lat1, lon1, lat2, lon2) -> np.ndarray:
+    """Calculate the Haversine distance (in meters) between two sets of coordinates."""
+    R = 6371000  # Earth radius in meters
+    phi1, phi2 = np.radians(lat1), np.radians(lat2)
+    dphi = np.radians(lat2 - lat1)
+    dlambda = np.radians(lon2 - lon1)
+
+    a = np.sin(dphi / 2.0) ** 2 + np.cos(phi1) * np.cos(phi2) * np.sin(dlambda / 2.0) ** 2
+    return 2 * R * np.arcsin(np.sqrt(a))
+
+
+def analyze_boars_vs_mushrooms(boars_file: str, mushrooms_file: str, threshold: int = 50) -> None:
+    """Full pipeline: load data, compute boar trajectories, analyze correlation with mushroom presence,
+    plot results, and compare groups.
+
+    Args:
+        boars_file (str): Path to the CSV file containing boars' trajectories.
+        mushrooms_file (str): Path to the CSV file containing mushroom pickers' presence data.
+        threshold (int, optional): Threshold for high vs low pressure groups. Defaults to 50.
+    """
+    # Load and preprocess data
+    boars = pd.read_csv(boars_file)
+    grzyby = pd.read_csv(mushrooms_file)
+
+    boars['datetime'] = pd.to_datetime(boars['datetime'])
+    boars['date'] = boars['datetime'].dt.date
+    grzyby['date'] = pd.to_datetime(grzyby['date'], dayfirst=True).dt.date
+
+    # Compute daily trajectories
+    boars = boars.sort_values(['user_id', 'datetime']).reset_index(drop=True)
+    boars['lat_shift'] = boars.groupby('user_id')['lat'].shift()
+    boars['lon_shift'] = boars.groupby('user_id')['lon'].shift()
+
+    boars['step_m'] = haversine(
+        boars['lat_shift'], boars['lon_shift'], boars['lat'], boars['lon']
+    )
+
+    traj_lengths = (
+        boars.groupby(['user_id', 'date'])['step_m']
+        .sum()
+        .reset_index(name='trajectory_m')
+    )
+
+    # Merge with mushroom presence data
+    merged = traj_lengths.merge(grzyby, on='date', how='left')
+
+    # Correlation analysis
+    corr, pval = pearsonr(merged['presence'], merged['trajectory_m'])
+    print(f"Pearson correlation r = {corr:.3f}, p = {pval:.3f}")
+
+    # Plot relationship
+    plt.figure(figsize=(8, 5))
+    sns.regplot(data=merged, x='presence', y='trajectory_m', scatter_kws={'alpha': 0.5})
+    plt.xlabel("Number of mushroom pickers (presence)")
+    plt.ylabel("Daily boar trajectory length [m]")
+    plt.title("Impact of mushroom pickers on boar movement")
+    plt.show()
+
+    # Compare groups
+    merged['pressure_group'] = merged['presence'].apply(
+        lambda x: "High" if x >= threshold else "Low"
+    )
+
+    group_means = merged.groupby('pressure_group')['trajectory_m'].mean()
+    print("Average daily trajectory lengths [m]:")
+    print(group_means)
